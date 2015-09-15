@@ -241,7 +241,7 @@ Fighter P2;
 
 void setupGame()
 {
-  P1 = heapAllocate!Fighter(-10.0, 0.0);
+  P1 = heap!Fighter((heap!Idle(-10.0, 0.0)));
 }
 
 void collisions(Fighter first, Fighter second)
@@ -267,9 +267,10 @@ struct hittri
 
 class Fighter
 {
-    this(double x, double y)
+    this(State s)
     {
-      state = heapAllocate!Idle(x, y);
+      state = s;
+      //state = heapAllocate!Idle(x, y);
       //tempState = heapAllocate!Idle(x, y);
     }
     
@@ -326,9 +327,10 @@ abstract class State
     this(double X, double Y)
     {super(X,Y);}
     override State createUpdate()
-    {return heapAllocate!Idle(x,y);} //Replace new with preallocated memory.
+    {return heap!Idle(x,y);} //Replace new with preallocated memory.
   }
 
+alias heapAllocate heap;
 
 //Heap allocation, TODO: BREAK OUT INTO NEW FILE
 T heapAllocate(T, Args...) (Args args) 

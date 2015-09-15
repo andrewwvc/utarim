@@ -129,16 +129,6 @@ void realtime() nothrow @nogc
         SDL_Surface* helloWorld;
         SDL_Renderer* gRenderer;
         
-        
-	
-	
-	
-// 	//Create renderer for window
-// 	gRenderer = SDL_CreateRenderer( gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC );
-// 	if( gRenderer == null ) { printf( "Renderer could not be created! SDL Error: %s\n", SDL_GetError() ); return;}
-// 	scope(exit) SDL_DestroyRenderer( gRenderer );
-// 	//Initialize renderer color
-// 	SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
 // 	
 // 	//Get window surface
 // 	//screenSurface = SDL_GetWindowSurface( gWindow );
@@ -165,13 +155,6 @@ void realtime() nothrow @nogc
 	scope(exit)
 	  {if (gGameController) SDL_JoystickClose(gGameController);}
 	
-// 	version (linux)
-// 	{
-// 	  import core.thread : sleep;
-// 	  SDL_MinimizeWindow(window);
-// 	  SDL_RestoreWindow(window);
-// 	  SDL_MaximizeWindow(window);
-// 	}
       
 	//While application is running
 	while( !quit )
@@ -245,18 +228,7 @@ void realtime() nothrow @nogc
 	  }
 	  
 	  
-	    //SDL_FillRect( screenSurface, null, SDL_MapRGB( screenSurface.format, 0x88, 0x88, 0x00 ) );
-	    //SDL_SetRenderDrawColor(gRenderer, 0x88, 0x88, 0x00, 0xFF);
-// 	    
-// 	  
-	  
-	  
 	  SDL_GL_SwapWindow( gWindow );
-	  
-	  //Update the surface
-	  //SDL_UpdateWindowSurface( window );
-	  //SDL_RenderClear(gRenderer);
-	  //SDL_RenderPresent( gRenderer );
 	}
 
         //Prints on safe exit
@@ -266,6 +238,11 @@ void realtime() nothrow @nogc
 
 Fighter P1;
 Fighter P2;
+
+void setupGame()
+{
+  P1 = heapAllocate!Fighter(-10.0, 0.0);
+}
 
 void collisions(Fighter first, Fighter second)
 {
@@ -290,14 +267,51 @@ struct hittri
 
 class Fighter
 {
+    this(double x, double y)
+    {
+      state = heapAllocate!Idle(x, y);
+      //tempState = heapAllocate!Idle(x, y);
+    }
+    
+    ~this()
+    {
+      //state should never be null
+      assert(state);
+      heapDeallocate(state);
+	
+      if(tempState)
+	heapDeallocate(tempState);
+    }
   
 //   class Tech
 //   {
 //     State createUpdate(){return State(0, 0, new Idle());}
 //     void update(State s) {}
 //   }
+  
+  void createUpdate()
+  {
+    if (tempState) heapDeallocate(tempState);
+    tempState = state.createUpdate();
+  }
+  void swapUpdate()
+  {
+    //state should never be null
+    assert(state);
+    if (tempState)
+    {
+      heapDeallocate(state);
+      state = tempState;
+      tempState = null;
+    }
+  }
 
-  abstract class State
+  State state;
+  State tempState;
+  alias state this;
+}
+
+abstract class State
   {
     this(double X, double Y)
     {x = X, y = Y;}
@@ -312,12 +326,51 @@ class Fighter
     this(double X, double Y)
     {super(X,Y);}
     override State createUpdate()
-    {return new Idle(x,y);} //Replace new with preallocated memory.
+    {return heapAllocate!Idle(x,y);} //Replace new with preallocated memory.
   }
-  
-  void update() {state = state.createUpdate();}
 
-  State state;
-  State tempState;
-  alias state this;
+
+//Heap allocation, TODO: BREAK OUT INTO NEW FILE
+T heapAllocate(T, Args...) (Args args) 
+{
+    import std.conv : emplace;
+    import core.stdc.stdlib : malloc;
+    import core.memory : GC;
+ 
+    // get class size of class instance in bytes
+    auto size = __traits(classInstanceSize, T);
+ 
+    // allocate memory for the object
+    auto memory = malloc(size)[0..size];
+    if(!memory)
+    {
+        import core.exception : onOutOfMemoryError;
+        onOutOfMemoryError();
+    }                    
+ 
+    writeln("Memory allocated");
+ 
+    // notify garbage collector that it should scan this memory
+    GC.addRange(memory.ptr, size);
+ 
+    // call T's constructor and emplace instance on
+    // newly allocated memory
+    return emplace!(T, Args)(memory, args);                                    
+}
+ 
+void heapDeallocate(T)(T obj) 
+{
+    import core.stdc.stdlib : free;
+    import core.memory : GC;
+ 
+    // calls obj's destructor
+    destroy(obj); 
+ 
+    // garbage collector should no longer scan this memory
+    GC.removeRange(cast(void*)obj);
+ 
+    // free memory occupied by object
+    free(cast(void*)obj);
+ 
+    writeln("Memory deallocated");
 }

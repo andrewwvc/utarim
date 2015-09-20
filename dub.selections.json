@@ -3,6 +3,7 @@
 	"versions": {
 		"derelict-util": "2.0.1",
 		"derelict-sdl2": "1.9.6",
+		"m3": "0.0.7",
 		"derelict-gl3": "1.0.14"
 	}
 }

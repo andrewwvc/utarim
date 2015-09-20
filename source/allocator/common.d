@@ -5,7 +5,7 @@ appropriate parts of `std`.
 
 Authors: $(WEB erdani.com, Andrei Alexandrescu), Timon Gehr (`Ternary`)
 */
-module std.experimental.allocator.common;
+module allocator.common;
 import std.algorithm, std.traits;
 
 /**
@@ -334,7 +334,7 @@ Returns $(D s) rounded up to the nearest power of 2.
 */
 package size_t roundUpToPowerOf2(size_t s)
 {
-    import std.meta : AliasSeq;
+    import allocator.meta : AliasSeq;
     assert(s <= (size_t.max >> 1) + 1);
     --s;
     static if (size_t.sizeof == 4)

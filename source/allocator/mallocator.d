@@ -1,5 +1,5 @@
-module std.experimental.allocator.mallocator;
-import std.experimental.allocator.common;
+module allocator.mallocator;
+import allocator.common;
 
 /**
    The C heap allocator.

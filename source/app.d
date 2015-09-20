@@ -2,6 +2,8 @@ import std.stdio;
 import core.memory;
 import derelict.sdl2.sdl;
 import derelict.opengl3.gl;
+import allocator.building_blocks.free_list;
+import m3.m3;
 
 
 //Screen dimension constants
@@ -129,19 +131,6 @@ void realtime() nothrow @nogc
         SDL_Surface* screenSurface;
         SDL_Surface* helloWorld;
         SDL_Renderer* gRenderer;
-        
-// 	
-// 	//Get window surface
-// 	//screenSurface = SDL_GetWindowSurface( gWindow );
-//       
-	helloWorld = SDL_LoadBMP( "hello_world.bmp" );
-	if(helloWorld == null)
-	    {printf("\'hello_world.bmp\' not found!\n"); return;}
-	scope(exit) SDL_FreeSurface(helloWorld);
-	
-	//Apply the image
-	//SDL_BlitSurface( helloWorld, null, screenSurface, null );
-      
 	//Main loop flag
 	bool quit = false;
 	//Event handler
@@ -242,7 +231,7 @@ Fighter P2;
 
 void setupGame() @nogc
 {
-  P1 = heap!Fighter(heap!Idle(-10.0, 0.0));
+  P1 = make!Fighter(make!Idle(-10.0, 0.0));
 }
 
 void collisions(Fighter first, Fighter second)
@@ -272,18 +261,16 @@ class Fighter
     {
       state = s;
       assert(s);
-      //state = heapAllocate!Idle(x, y);
-      //tempState = heapAllocate!Idle(x, y);
     }
     
     ~this() @nogc
     {
       //state should never be null
       assert(state);
-      heapDeallocate(state);
+      destruct(state);
 	
       if(tempState)
-	heapDeallocate(tempState);
+	destruct(tempState);
     }
   
 //   class Tech
@@ -294,7 +281,7 @@ class Fighter
   
   void createUpdate()
   {
-    if (tempState) heapDeallocate(tempState);
+    if (tempState) destruct(tempState);
     tempState = state.createUpdate();
   }
   void swapUpdate()
@@ -303,7 +290,7 @@ class Fighter
     assert(state);
     if (tempState)
     {
-      heapDeallocate(state);
+      destruct(state);
       state = tempState;
       tempState = null;
     }
@@ -319,7 +306,7 @@ abstract class State
     this(double X, double Y) @nogc
     {x = X, y = Y;}
     
-    ~this(); @nogc
+    ~this() @nogc {} 
     
     double x, y;
     
@@ -330,59 +317,9 @@ abstract class State
   {
     this(double X, double Y) @nogc
     {super(x,y);}
+    
+    ~this() @nogc {}
+    
     override State createUpdate() @nogc
-    {return heap!Idle(x,y);} //Replace new with preallocated memory.
+    {return make!Idle(x,y);} //Replace new with preallocated memory.
   }
-
-alias heapAllocate heap;
-
-//Heap allocation, TODO: BREAK OUT INTO NEW FILE
-T heapAllocate(T, Args...) (Args args) @nogc
-{
-    import std.conv : emplace;
-    import core.stdc.stdlib : malloc;
-    //import core.memory : GC;
- 
-    // get class size of class instance in bytes
-    auto size = __traits(classInstanceSize, T);
- 
-    // allocate memory for the object
-    auto memory = malloc(size)[0..size];
-    if(!memory)
-    {
-        import core.exception : onOutOfMemoryError;
-        onOutOfMemoryError();
-    }                    
- 
-    printf("Memory allocated");
- 
-    // notify garbage collector that it should scan this memory
-    //GC.addRange(memory.ptr, size);
- 
-    // call T's constructor and emplace instance on
-    // newly allocated memory
-    return emplace!(T, Args)(memory, args);                                    
-}
- 
-void heapDeallocate(T)(T obj) @nogc
-{
-    import core.stdc.stdlib : free;
-    //import core.memory : GC;
- 
-    // calls obj's destructor
-    destroy(obj); 
- 
-    // garbage collector should no longer scan this memory
-    //GC.removeRange(cast(void*)obj);
- 
-    // free memory occupied by object
-    free(cast(void*)obj);
- 
-    printf("Memory deallocated");
-}
-
-
-class FreeList
-{
-  this();
-}

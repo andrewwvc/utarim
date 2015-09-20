@@ -3,6 +3,7 @@ import core.memory;
 import derelict.sdl2.sdl;
 import derelict.opengl3.gl;
 
+
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
@@ -239,9 +240,9 @@ void realtime() nothrow @nogc
 Fighter P1;
 Fighter P2;
 
-void setupGame()
+void setupGame() @nogc
 {
-  P1 = heap!Fighter((heap!Idle(-10.0, 0.0)));
+  P1 = heap!Fighter(heap!Idle(-10.0, 0.0));
 }
 
 void collisions(Fighter first, Fighter second)
@@ -249,7 +250,7 @@ void collisions(Fighter first, Fighter second)
   
 }
 
-void gameUpdate()
+void gameUpdate() @nogc
 {
   
 }
@@ -267,14 +268,15 @@ struct hittri
 
 class Fighter
 {
-    this(State s)
+    this(State s) @nogc
     {
       state = s;
+      assert(s);
       //state = heapAllocate!Idle(x, y);
       //tempState = heapAllocate!Idle(x, y);
     }
     
-    ~this()
+    ~this() @nogc
     {
       //state should never be null
       assert(state);
@@ -314,8 +316,10 @@ class Fighter
 
 abstract class State
   {
-    this(double X, double Y)
+    this(double X, double Y) @nogc
     {x = X, y = Y;}
+    
+    ~this(); @nogc
     
     double x, y;
     
@@ -324,20 +328,20 @@ abstract class State
   
   class Idle : State
   {
-    this(double X, double Y)
-    {super(X,Y);}
-    override State createUpdate()
+    this(double X, double Y) @nogc
+    {super(x,y);}
+    override State createUpdate() @nogc
     {return heap!Idle(x,y);} //Replace new with preallocated memory.
   }
 
 alias heapAllocate heap;
 
 //Heap allocation, TODO: BREAK OUT INTO NEW FILE
-T heapAllocate(T, Args...) (Args args) 
+T heapAllocate(T, Args...) (Args args) @nogc
 {
     import std.conv : emplace;
     import core.stdc.stdlib : malloc;
-    import core.memory : GC;
+    //import core.memory : GC;
  
     // get class size of class instance in bytes
     auto size = __traits(classInstanceSize, T);
@@ -350,29 +354,35 @@ T heapAllocate(T, Args...) (Args args)
         onOutOfMemoryError();
     }                    
  
-    writeln("Memory allocated");
+    printf("Memory allocated");
  
     // notify garbage collector that it should scan this memory
-    GC.addRange(memory.ptr, size);
+    //GC.addRange(memory.ptr, size);
  
     // call T's constructor and emplace instance on
     // newly allocated memory
     return emplace!(T, Args)(memory, args);                                    
 }
  
-void heapDeallocate(T)(T obj) 
+void heapDeallocate(T)(T obj) @nogc
 {
     import core.stdc.stdlib : free;
-    import core.memory : GC;
+    //import core.memory : GC;
  
     // calls obj's destructor
     destroy(obj); 
  
     // garbage collector should no longer scan this memory
-    GC.removeRange(cast(void*)obj);
+    //GC.removeRange(cast(void*)obj);
  
     // free memory occupied by object
     free(cast(void*)obj);
  
-    writeln("Memory deallocated");
+    printf("Memory deallocated");
+}
+
+
+class FreeList
+{
+  this();
 }

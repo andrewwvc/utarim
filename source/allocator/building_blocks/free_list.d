@@ -47,7 +47,7 @@ struct FreeList(ParentAllocator,
         freelist. (If $(D minSize != chooseAtRuntime), this is simply an alias
         for $(D minSize).)
         */
-        @property size_t min() const
+        @property size_t min() const @nogc
         {
             assert(_min != chooseAtRuntime);
             return _min;
@@ -66,7 +66,7 @@ struct FreeList(ParentAllocator,
 
         Postcondition: $(D min == low)
         */
-        @property void min(size_t low)
+        @property void min(size_t low) @nogc
         {
             assert(low <= max || max == chooseAtRuntime);
             minimize;
@@ -89,7 +89,7 @@ struct FreeList(ParentAllocator,
         same constraint gets deallocated, it is put in the freelist with the
         allocated size assumed to be $(D max).
         */
-        @property size_t max() const { return _max; }
+        @property size_t max() const @nogc { return _max; }
 
         /**
         If $(D FreeList) has been instantiated with $(D maxSize ==
@@ -104,7 +104,7 @@ struct FreeList(ParentAllocator,
 
         Postcondition: $(D max == high)
         */
-        @property void max(size_t high)
+        @property void max(size_t high) @nogc
         {
             assert((high >= min || min == chooseAtRuntime)
                 && high >= (void*).sizeof);
@@ -127,19 +127,19 @@ struct FreeList(ParentAllocator,
         alias max = maxSize;
     }
 
-    private bool tooSmall(size_t n) const
+    private bool tooSmall(size_t n) const @nogc
     {
         static if (minSize == 0) return false;
         else return n < min;
     }
 
-    private bool tooLarge(size_t n) const
+    private bool tooLarge(size_t n) const @nogc
     {
         static if (maxSize == unbounded) return false;
         else return n > max;
     }
 
-    private bool freeListEligible(size_t n) const
+    private bool freeListEligible(size_t n) const @nogc
     {
         static if (unchecked)
         {
@@ -159,7 +159,7 @@ struct FreeList(ParentAllocator,
     }
 
     static if (!unchecked)
-    private void[] blockFor(Node* p)
+    private void[] blockFor(Node* p) @nogc
     {
         assert(p);
         return (cast(void*) p)[0 .. max];
@@ -173,7 +173,7 @@ struct FreeList(ParentAllocator,
         private double probMiss = 1.0; // start with a high miss probability
         private uint accumSamples, accumMisses;
 
-        void updateStats()
+        void updateStats() @nogc
         {
             assert(accumSamples >= accumMisses);
             /*
@@ -233,7 +233,7 @@ struct FreeList(ParentAllocator,
     Postcondition:
     $(D result >= bytes)
     */
-    size_t goodAllocSize(size_t bytes)
+    size_t goodAllocSize(size_t bytes) @nogc
     {
         assert(minSize != chooseAtRuntime && maxSize != chooseAtRuntime);
         static if (maxSize != unbounded)
@@ -249,7 +249,7 @@ struct FreeList(ParentAllocator,
         return parent.goodAllocSize(bytes);
     }
 
-    private void[] allocateEligible(size_t bytes)
+    private void[] allocateEligible(size_t bytes) @nogc
     {
         assert(bytes);
         if (root)
@@ -302,7 +302,7 @@ struct FreeList(ParentAllocator,
 
     Postcondition: $(D result.length == bytes || result is null)
     */
-    void[] allocate(size_t n)
+    void[] allocate(size_t n) @nogc
     {
         static if (adaptive == Yes.adaptive) ++accumSamples;
         assert(n < size_t.max / 2);
@@ -338,7 +338,7 @@ struct FreeList(ParentAllocator,
     freelist, and no dynamic changing of $(D min) or $(D max) is allowed to
     occur between allocation and deallocation.
     */
-    bool deallocate(void[] block)
+    bool deallocate(void[] block) @nogc
     {
         if (freeListEligible(block.length))
         {
@@ -363,7 +363,7 @@ struct FreeList(ParentAllocator,
     forwards to it and resets the freelist.
     */
     static if (hasMember!(ParentAllocator, "deallocateAll"))
-    bool deallocateAll()
+    bool deallocateAll() @nogc
     {
         root = null;
         return parent.deallocateAll();
@@ -375,7 +375,7 @@ struct FreeList(ParentAllocator,
     $(D deallocate).
     */
     static if (hasMember!(ParentAllocator, "deallocate") && !unchecked)
-    void minimize()
+    void minimize() @nogc
     {
         while (root)
         {
@@ -495,14 +495,14 @@ struct ContiguousFreeList(ParentAllocator,
     initialized with $(D max).
     */
     static if (!stateSize!ParentAllocator)
-    this(void[] buffer)
+    this(void[] buffer) @nogc
     {
         initialize(buffer);
     }
 
     /// ditto
     static if (stateSize!ParentAllocator)
-    this(ParentAllocator parent, void[] buffer)
+    this(ParentAllocator parent, void[] buffer) @nogc
     {
         initialize(buffer);
         this.parent = SParent(parent);
@@ -510,14 +510,14 @@ struct ContiguousFreeList(ParentAllocator,
 
     /// ditto
     static if (!stateSize!ParentAllocator)
-    this(size_t bytes)
+    this(size_t bytes) @nogc
     {
         initialize(ParentAllocator.instance.allocate(bytes));
     }
 
     /// ditto
     static if (stateSize!ParentAllocator)
-    this(ParentAllocator parent, size_t bytes)
+    this(ParentAllocator parent, size_t bytes) @nogc
     {
         initialize(parent.allocate(bytes));
         this.parent = SParent(parent);

@@ -224,7 +224,7 @@ size_t goodAllocSize(A)(auto ref A a, size_t n)
 /**
 Returns s rounded up to a multiple of base.
 */
-package size_t roundUpToMultipleOf(size_t s, uint base)
+package size_t roundUpToMultipleOf(size_t s, uint base) @nogc
 {
     assert(base);
     auto rem = s % base;
@@ -242,7 +242,7 @@ unittest
 /**
 Returns `n` rounded up to a multiple of alignment, which must be a power of 2.
 */
-package size_t roundUpToAlignment(size_t n, uint alignment)
+package size_t roundUpToAlignment(size_t n, uint alignment) @nogc
 {
     assert(alignment.isPowerOf2);
     immutable uint slack = cast(uint) n & (alignment - 1);
@@ -264,7 +264,7 @@ unittest
 /**
 Returns `n` rounded down to a multiple of alignment, which must be a power of 2.
 */
-package size_t roundDownToAlignment(size_t n, uint alignment)
+package size_t roundDownToAlignment(size_t n, uint alignment) @nogc
 {
     assert(alignment.isPowerOf2);
     return n & ~size_t(alignment - 1);
@@ -283,7 +283,7 @@ Advances the beginning of `b` to start at alignment `a`. The resulting buffer
 may therefore be shorter. Returns the adjusted buffer, or null if obtaining a
 non-empty buffer is impossible.
 */
-package void[] roundUpToAlignment(void[] b, uint a)
+package void[] roundUpToAlignment(void[] b, uint a) @nogc
 {
     auto e = b.ptr + b.length;
     auto p = cast(void*) roundUpToAlignment(cast(size_t) b.ptr, a);
@@ -303,7 +303,7 @@ unittest
 /**
 Like `a / b` but rounds the result up, not down.
 */
-package size_t divideRoundUp(size_t a, size_t b)
+package size_t divideRoundUp(size_t a, size_t b) @nogc
 {
     assert(b);
     return (a + b - 1) / b;
@@ -312,7 +312,7 @@ package size_t divideRoundUp(size_t a, size_t b)
 /**
 Returns `s` rounded up to a multiple of `base`.
 */
-package void[] roundStartToMultipleOf(void[] s, uint base)
+package void[] roundStartToMultipleOf(void[] s, uint base) @nogc
 {
     assert(base);
     auto p = cast(void*) roundUpToMultipleOf(
@@ -332,7 +332,7 @@ unittest
 /**
 Returns $(D s) rounded up to the nearest power of 2.
 */
-package size_t roundUpToPowerOf2(size_t s)
+package size_t roundUpToPowerOf2(size_t s) @nogc
 {
     import allocator.meta : AliasSeq;
     assert(s <= (size_t.max >> 1) + 1);
@@ -367,7 +367,7 @@ unittest
 /**
 Returns the number of trailing zeros of $(D x).
 */
-package uint trailingZeros(ulong x)
+package uint trailingZeros(ulong x) @nogc
 {
     uint result;
     while (result < 64 && !(x & (1UL << result)))
@@ -389,7 +389,7 @@ unittest
 /**
 Returns `true` if `ptr` is aligned at `alignment`.
 */
-package bool alignedAt(void* ptr, uint alignment)
+package bool alignedAt(void* ptr, uint alignment) @nogc
 {
     return cast(size_t) ptr % alignment == 0;
 }
@@ -398,7 +398,7 @@ package bool alignedAt(void* ptr, uint alignment)
 Returns the effective alignment of `ptr`, i.e. the largest power of two that is
 a divisor of `ptr`.
 */
-package uint effectiveAlignment(void* ptr)
+package uint effectiveAlignment(void* ptr) @nogc
 {
     return 1U << trailingZeros(cast(size_t) ptr);
 }
@@ -413,7 +413,7 @@ unittest
 Aligns a pointer down to a specified alignment. The resulting pointer is less
 than or equal to the given pointer.
 */
-package void* alignDownTo(void* ptr, uint alignment)
+package void* alignDownTo(void* ptr, uint alignment) @nogc
 {
     assert(alignment.isPowerOf2);
     return cast(void*) (cast(size_t) ptr & ~(alignment - 1UL));
@@ -423,7 +423,7 @@ package void* alignDownTo(void* ptr, uint alignment)
 Aligns a pointer up to a specified alignment. The resulting pointer is greater
 than or equal to the given pointer.
 */
-package void* alignUpTo(void* ptr, uint alignment)
+package void* alignUpTo(void* ptr, uint alignment) @nogc
 {
     assert(alignment.isPowerOf2);
     immutable uint slack = cast(size_t) ptr & (alignment - 1U);
@@ -434,7 +434,7 @@ package void* alignUpTo(void* ptr, uint alignment)
 /**
 Returns `true` if `x` is a nonzero power of two.
 */
-package bool isPowerOf2(uint x)
+package bool isPowerOf2(uint x) @nogc
 {
     return (x & -x) > (x - 1);
 }
@@ -455,12 +455,12 @@ unittest
     assert(isPowerOf2(1UL << 31));
 }
 
-package bool isGoodStaticAlignment(uint x)
+package bool isGoodStaticAlignment(uint x) @nogc
 {
     return x.isPowerOf2;
 }
 
-package bool isGoodDynamicAlignment(uint x)
+package bool isGoodDynamicAlignment(uint x) @nogc
 {
     return x.isPowerOf2 && x >= (void*).sizeof;
 }
@@ -503,7 +503,7 @@ defined. This is deliberate so allocators may use it internally within their own
 implementation of $(D reallocate).
 
 */
-bool reallocate(Allocator)(ref Allocator a, ref void[] b, size_t s)
+bool reallocate(Allocator)(ref Allocator a, ref void[] b, size_t s) @nogc
 {
     if (b.length == s) return true;
     static if (hasMember!(Allocator, "expand"))
@@ -535,7 +535,7 @@ implementation of $(D reallocate).
 
 */
 bool alignedReallocate(Allocator)(ref Allocator alloc,
-        ref void[] b, size_t s, uint a)
+        ref void[] b, size_t s, uint a) @nogc
 {
     static if (hasMember!(Allocator, "expand"))
     {
@@ -573,7 +573,7 @@ Forwards each of the methods in `funs` (if defined) to `member`.
     return result;
 }
 
-package void testAllocator(alias make)()
+package void testAllocator(alias make)() @nogc
 {
     import std.conv : text;
     import std.stdio : writeln, stderr;

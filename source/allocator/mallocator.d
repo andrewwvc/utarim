@@ -21,7 +21,7 @@ struct Mallocator
     paradoxically, $(D malloc) is $(D @safe) but that's only useful to safe
     programs that can afford to leak memory allocated.
     */
-    @trusted void[] allocate(size_t bytes) shared
+    @trusted void[] allocate(size_t bytes) shared @nogc
     {
         import core.stdc.stdlib : malloc;
         if (!bytes) return null;
@@ -30,7 +30,7 @@ struct Mallocator
     }
 
     /// Ditto
-    @system bool deallocate(void[] b) shared
+    @system bool deallocate(void[] b) shared @nogc
     {
         import core.stdc.stdlib : free;
         free(b.ptr);
@@ -38,7 +38,7 @@ struct Mallocator
     }
 
     /// Ditto
-    @system bool reallocate(ref void[] b, size_t s) shared
+    @system bool reallocate(ref void[] b, size_t s) shared @nogc
     {
         import core.stdc.stdlib : realloc;
         if (!s)
@@ -96,7 +96,7 @@ unittest
     test!Mallocator();
 }
 
-version (Posix) private extern(C) int posix_memalign(void**, size_t, size_t);
+version (Posix) private extern(C) int posix_memalign(void**, size_t, size_t) @nogc;
 version (Windows)
 {
     // DMD Win 32 bit, DigitalMars C standard library misses the _aligned_xxx
@@ -196,7 +196,7 @@ struct AlignedMallocator
     /**
     Forwards to $(D alignedAllocate(bytes, platformAlignment)).
     */
-    @trusted void[] allocate(size_t bytes) shared
+    @trusted void[] allocate(size_t bytes) shared @nogc
     {
         if (!bytes) return null;
         return alignedAllocate(bytes, alignment);
@@ -209,21 +209,27 @@ struct AlignedMallocator
     $(D __aligned_malloc)) on Windows.
     */
     version(Posix) @trusted
-    void[] alignedAllocate(size_t bytes, uint a) shared
+    void[] alignedAllocate(size_t bytes, uint a) shared @nogc
     {
-        import std.conv : to;
+        //import std.conv : to;
+        import m3.Transform : convert;
         import core.stdc.errno : ENOMEM;
-        assert(a.isGoodDynamicAlignment, to!string(a));
+        assert(a.isGoodDynamicAlignment, convert!uint(a));
         void* result;
         auto code = posix_memalign(&result, a, bytes);
         if (code == ENOMEM) return null;
-        import std.exception : enforce;
-        import std.conv : text;
-        enforce(code == 0, text("Invalid alignment requested: ", a));
+        //import std.exception : enforce;
+        //import std.conv : text;
+        //import m3.Transform : format;
+        //HACK: Uses InvalidMemory to signal an error (which should be an exception) without invoking the GC.
+        import core.exception : onInvalidMemoryOperationError;
+        if (code == 0)
+	  onInvalidMemoryOperationError();
+        //enforce(code == 0, format("{}{}","Invalid alignment requested: ", a));
         return result[0 .. bytes];
     }
     else version(Windows) @trusted
-    void[] alignedAllocate(size_t bytes, uint a) shared
+    void[] alignedAllocate(size_t bytes, uint a) shared @nogc
     {
         auto result = _aligned_malloc(bytes, a);
         return result ? result[0 .. bytes] : null;
@@ -236,14 +242,14 @@ struct AlignedMallocator
     $(D __aligned_free(b.ptr))) on Windows.
     */
     version (Posix) @system
-    bool deallocate(void[] b) shared
+    bool deallocate(void[] b) shared @nogc
     {
         import core.stdc.stdlib : free;
         free(b.ptr);
         return true;
     }
     else version (Windows) @system
-    bool deallocate(void[] b) shared
+    bool deallocate(void[] b) shared @nogc
     {
         _aligned_free(b.ptr);
         return true;
@@ -254,12 +260,12 @@ struct AlignedMallocator
     On Posix, forwards to $(D realloc). On Windows, forwards to
     $(D alignedReallocate(b, newSize, platformAlignment)).
     */
-    version (Posix) @system bool reallocate(ref void[] b, size_t newSize) shared
+    version (Posix) @system bool reallocate(ref void[] b, size_t newSize) shared @nogc
     {
         return Mallocator.instance.reallocate(b, newSize);
     }
     version (Windows) @system
-    bool reallocate(ref void[] b, size_t newSize) shared
+    bool reallocate(ref void[] b, size_t newSize) shared @nogc
     {
         return alignedReallocate(b, newSize, alignment);
     }
@@ -271,7 +277,7 @@ struct AlignedMallocator
     $(D __aligned_realloc(b.ptr, newSize, a))).
     */
     version (Windows) @system
-    bool alignedReallocate(ref void[] b, size_t s, uint a) shared
+    bool alignedReallocate(ref void[] b, size_t s, uint a) shared @nogc
     {
         if (!s)
         {

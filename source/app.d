@@ -123,7 +123,10 @@ void main()
 	return; }
 	
 	//Initialize clear color
-	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f ); 
+	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
+	
+	import m3.Transform : format;
+	writeln( format("{}{}{}", 2, " ", 0.5f));
 	
 	
       

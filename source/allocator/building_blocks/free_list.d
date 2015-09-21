@@ -27,7 +27,8 @@ struct FreeList(ParentAllocator,
     size_t minSize, size_t maxSize = minSize,
     Flag!"adaptive" adaptive = No.adaptive)
 {
-    import std.conv : text;
+    //import std.conv : text; //Changed to m3 equivilent
+    import m3.Transform : format;
     import std.exception : enforce;
     import std.traits : hasMember;
 
@@ -241,7 +242,7 @@ struct FreeList(ParentAllocator,
             if (freeListEligible(bytes))
             {
                 assert(parent.goodAllocSize(max) == max,
-                    text("Wrongly configured freelist: maximum should be ",
+                    format("{}{}{}{}", "Wrongly configured freelist: maximum should be ",
                         parent.goodAllocSize(max), " instead of ", max));
                 return max;
             }
@@ -451,7 +452,7 @@ struct ContiguousFreeList(ParentAllocator,
     /// Alignment offered.
     enum uint alignment = (void*).alignof;
 
-    private void initialize(void[] buffer, size_t itemSize = fl.max)
+    private void initialize(void[] buffer, size_t itemSize = fl.max) @nogc
     {
         assert(itemSize != unbounded && itemSize != chooseAtRuntime);
         assert(buffer.ptr.alignedAt(alignment));
@@ -526,7 +527,7 @@ struct ContiguousFreeList(ParentAllocator,
     /// ditto
     static if (!stateSize!ParentAllocator
         && (maxSize == chooseAtRuntime || maxSize == unbounded))
-    this(size_t bytes, size_t max)
+    this(size_t bytes, size_t max) @nogc
     {
         static if (maxSize == chooseAtRuntime) fl.max = max;
         static if (minSize == chooseAtRuntime) fl.min = max;
@@ -536,7 +537,7 @@ struct ContiguousFreeList(ParentAllocator,
     /// ditto
     static if (stateSize!ParentAllocator
         && (maxSize == chooseAtRuntime || maxSize == unbounded))
-    this(ParentAllocator parent, size_t bytes, size_t max)
+    this(ParentAllocator parent, size_t bytes, size_t max) @nogc
     {
         static if (maxSize == chooseAtRuntime) fl.max = max;
         static if (minSize == chooseAtRuntime) fl.min = max;
@@ -548,7 +549,7 @@ struct ContiguousFreeList(ParentAllocator,
     static if (!stateSize!ParentAllocator
         && (maxSize == chooseAtRuntime || maxSize == unbounded)
         && minSize == chooseAtRuntime)
-    this(size_t bytes, size_t min, size_t max)
+    this(size_t bytes, size_t min, size_t max) @nogc
     {
         static if (maxSize == chooseAtRuntime) fl.max = max;
         fl.min = min;
@@ -561,7 +562,7 @@ struct ContiguousFreeList(ParentAllocator,
     static if (stateSize!ParentAllocator
         && (maxSize == chooseAtRuntime || maxSize == unbounded)
         && minSize == chooseAtRuntime)
-    this(ParentAllocator parent, size_t bytes, size_t min, size_t max)
+    this(ParentAllocator parent, size_t bytes, size_t min, size_t max) @nogc
     {
         static if (maxSize == chooseAtRuntime) fl.max = max;
         fl.min = min;
@@ -581,7 +582,7 @@ struct ContiguousFreeList(ParentAllocator,
     Postcondition:
     $(D result >= bytes)
     */
-    size_t goodAllocSize(size_t n)
+    size_t goodAllocSize(size_t n) @nogc
     {
         if (fl.freeListEligible(n)) return fl.max;
         return parent.goodAllocSize(n);

@@ -2,7 +2,6 @@ import std.stdio;
 import core.memory;
 import derelict.sdl2.sdl;
 import derelict.opengl3.gl;
-import allocator.building_blocks.free_list;
 import m3.m3;
 
 
@@ -124,10 +123,6 @@ void main()
 	
 	//Initialize clear color
 	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
-	
-	import m3.Transform : format;
-	writeln( format("{}{}{}", 2, " ", 0.5f));
-	
 	
       
         //Collects all garbage and suspends the GC
@@ -365,12 +360,49 @@ class Fighter
   alias state this;
 }
 
+// template isDerivedClass(B, D)
+//   if (is(B == class) && is (D == class))
+//  {
+//   static if (is (B : D))
+//     enum isDerivedClass = true;
+//     else
+//     {
+//       enum isDerivedClass = (staticIndexOf!(B, BaseClassesTuple!(D)) > -1);
+//     }
+//  }
+
+import allocator.building_blocks.free_list;
+import allocator.mallocator;
+import std.traits;
+
+const size_t maxStateSize = Idle.sizeof;
+FreeList!(Mallocator, State.sizeof, maxStateSize) stateFreeList;
+
+auto makeState(T, Args...)(auto ref Args args) if (is(T : State))
+{
+  //enum size_t SIZE = SizeOf!(T);
+  auto mem = stateFreeList.allocate(SizeOf!(T));
+  
+  return emplace!(T)(mem, args);
+}
+
+void breakState(State state)
+{
+  if (state)
+  {
+    static if (__traits(hasMember, State, "__dtor"))
+	      state.__dtor();
+    stateFreeList.deallocate((cast(ubyte*)state)[0..state.sizeof]);
+    state = null;
+  }
+}
+
 abstract class State
   {
     this(greal x, greal y) @nogc
     {this.x = x, this.y = y;}
     
-    //~this() @nogc; 
+    //~this() @nogc;
     
     public greal x, y;
     

@@ -8,9 +8,9 @@ import m3.m3;
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
-const int SCREEN_HEIGHT = 480;
+const int SCREEN_HEIGHT = 640;
 
- SDL_Window* gWindow;
+SDL_Window* gWindow;
 
 //OpenGL context
 SDL_GLContext gContext;
@@ -24,14 +24,17 @@ GLint gVertexPos2DLocation = -1;
 GLuint gVBO = 0;
 GLuint gIBO = 0;
 
+alias greal = float;
+
 //Globals
-SDL_Joystick* gGameController = null;
+SDL_Joystick*[2] gGameControllers;
 
 void setupControllers() nothrow @nogc
 {
-  SDL_Joystick* returnedController = null;
+  //SDL_Joystick* returnedController = null;
   
-  printf( "Number of joysticks connected: %i\n", SDL_NumJoysticks() );
+  int numJoys = SDL_NumJoysticks();
+  printf( "Number of joysticks connected: %i\n", numJoys);
 	
   //Check for joysticks
   if( SDL_NumJoysticks() < 1 )
@@ -49,13 +52,22 @@ void setupControllers() nothrow @nogc
 	printf("\tNumber of Axes: %d\n", SDL_JoystickNumAxes(controler));
 	printf("\tNumber of Buttons: %d\n", SDL_JoystickNumButtons(controler));
 	printf("\tNumber of Balls: %d\n\n", SDL_JoystickNumBalls(controler));
+	if (ii < gGameControllers.length)
+	  gGameControllers[ii] = controler;
       }
-      SDL_JoystickClose(controler);
+      //SDL_JoystickClose(controler);
     }
   }
-  
-  printf("%i\n", SDL_JoystickEventState(SDL_QUERY));
 }
+
+void takedownControllers() @nogc
+{
+  foreach (SDL_Joystick* joy; gGameControllers)
+    if (joy)
+      SDL_JoystickClose(joy);
+}
+
+
 
 
 void main()
@@ -124,7 +136,7 @@ void main()
         realtime();
 }
 
-void realtime() nothrow @nogc
+void realtime() @nogc
 {
 	//The images
        
@@ -141,9 +153,10 @@ void realtime() nothrow @nogc
 	uint initTime = SDL_GetTicks();
 	
 	setupControllers();
-	gGameController = SDL_JoystickOpen( 0 );
 	scope(exit)
-	  {if (gGameController) SDL_JoystickClose(gGameController);}
+	  takedownControllers();
+	  
+	setupGame();
 	
       
 	//While application is running
@@ -172,7 +185,7 @@ void realtime() nothrow @nogc
 		
 		default:
 		//SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
-		glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+		//glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 		//Apply the image
 		//SDL_BlitSurface( helloWorld, null, screenSurface, null);
 	      }
@@ -180,43 +193,37 @@ void realtime() nothrow @nogc
 	    
 	  }
 	  
-	  if( currentKeyStates[ SDL_SCANCODE_DOWN ] )
-	    glColor4f(0.0f, 0.8f, 0.8f, 1.0f);
-	  else if(currentKeyStates[SDL_SCANCODE_UP])
-	  {
-	  	glColor4f(1.0f, 0.8f, 0.0f, 1.0f);
-	  }
+// 	  if( currentKeyStates[ SDL_SCANCODE_DOWN ] )
+// 	    glColor4f(0.0f, 0.8f, 0.8f, 1.0f);
+// 	  else if(currentKeyStates[SDL_SCANCODE_UP])
+// 	  {
+// 	  	glColor4f(1.0f, 0.8f, 0.0f, 1.0f);
+// 	  }
+// 	  
+// 	  if (gGameControllers[0])
+// 	  {
+// 	    if (SDL_JoystickGetButton(gGameControllers[0], 0))
+// 	    {
+// 	      glColor4f(1.0f, 0.8f, 0.0f, 1.0f);
+// 	    }
+// 	    
+// 	    if (SDL_JoystickGetAxis(gGameControllers[0], 0) > 10000)
+// 	    {
+// 	      glColor4f(0.0f, 0.85f, 0.0f, 1.0f);
+// 	      //SDL_SetRenderDrawColor(gRenderer, 0x00, 0xCC, 0x00, 0xFF);
+// 	    }
+// 	    
+// 	  }
 	  
-	  if (gGameController)
-	  {
-	    if (SDL_JoystickGetButton(gGameController, 0))
-	    {
-	      //SDL_RestoreWindow(window);
-	      //SDL_FillRect( screenSurface, null, SDL_MapRGB( screenSurface.format, 0x88, 0x00, 0xAA ));
-	      //SDL_SetRenderDrawColor(gRenderer, 0x88, 0x00, 0xAA, 0xFF);
-	      glColor4f(0.55f, 0.0f, 0.7f, 1.0f);
-	    }
-	    else if (SDL_JoystickGetAxis(gGameController, 0) > 10000)
-	    {
-	      glColor4f(0.0f, 0.85f, 0.0f, 1.0f);
-	      //SDL_SetRenderDrawColor(gRenderer, 0x00, 0xCC, 0x00, 0xFF);
-	    }
-	    
-	  }
+	  setButtons(0, 0);
+	  setButtons(1, 1);
+	  
+	  gameUpdate();
 	  
 	  //Clear color buffer
 	  glClear( GL_COLOR_BUFFER_BIT );
-	  //Render quad
-	  if( gRenderQuad )
-	  {
-	    glBegin( GL_QUADS );
-	    glVertex2f( -0.5f, -0.5f );
-	    glVertex2f( 0.5f, -0.5f );
-	    glVertex2f( 0.5f, 0.5f );
-	    glVertex2f( -0.5f, 0.5f );
-	    glEnd();
-	  }
 	  
+	  renderFighters();
 	  
 	  SDL_GL_SwapWindow( gWindow );
 	}
@@ -228,26 +235,55 @@ void realtime() nothrow @nogc
 
 Fighter P1;
 Fighter P2;
+Fighter[2] Players;
 
 void setupGame() @nogc
 {
   P1 = make!Fighter(make!Idle(-10.0, 0.0));
+  P2 = make!Fighter(make!Idle(10.0, 0.0));
+  Players[0] = P1;
+  Players[1] = P2;
 }
 
-void collisions(Fighter first, Fighter second)
+void renderFighters() @nogc
+{
+  P1.render();
+  P2.render();
+}
+
+void collisions(Fighter first, Fighter second) @nogc
 {
   
 }
 
 void gameUpdate() @nogc
 {
-  
+  P1.createUpdate();
+  P2.createUpdate();
+  collisions(P1, P2);
+  P1.swapUpdate();
+  P2.swapUpdate();
 }
 
 struct ControlInput
 {
-  enum direction {up, down, left, right};
-  
+  enum vertDir {up, down, neutral};
+  enum horiDir {left, right, neutral};
+  bool[4] buttons;
+}
+
+void setButtons(int playerNum, int controlNum) @nogc
+{
+  if (gGameControllers[controlNum])
+  {
+    with(Players[playerNum].ci)
+    {
+      int numButtons = SDL_JoystickNumButtons(gGameControllers[controlNum]);
+      for (int ii = 0; ii < buttons.length ; ii++)
+	if (ii < numButtons)
+	  buttons[ii] = 0 != SDL_JoystickGetButton(gGameControllers[controlNum], ii);
+    }
+  }
 }
 
 struct hittri
@@ -263,7 +299,7 @@ class Fighter
       assert(s);
     }
     
-    ~this() @nogc
+    ~this()  @nogc
     {
       //state should never be null
       assert(state);
@@ -279,12 +315,12 @@ class Fighter
 //     void update(State s) {}
 //   }
   
-  void createUpdate()
+  void createUpdate() @nogc
   {
     if (tempState) destruct(tempState);
-    tempState = state.createUpdate();
+    tempState = state.makeUpdate();
   }
-  void swapUpdate()
+  void swapUpdate() @nogc
   {
     //state should never be null
     assert(state);
@@ -295,31 +331,56 @@ class Fighter
       tempState = null;
     }
   }
-
-  State state;
-  State tempState;
+  
+  void render() @nogc
+  {
+    //Render quad
+    if( gRenderQuad )
+    {
+      const greal hsize = 8.0f/2.0f;
+      glPushMatrix();
+      glScalef(0.05f, 0.05f, 0.05f);
+      glTranslatef(cast(float)x, cast(float)y, 0.0f);
+      glBegin( GL_QUADS );
+      glColor4f(ci.buttons[0] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+      glVertex2f( -hsize, -hsize );
+      glColor4f(ci.buttons[1] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+      glVertex2f( hsize, -hsize );
+      glColor4f(ci.buttons[2] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+      glVertex2f( hsize, hsize );
+      glColor4f(ci.buttons[3] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+      glVertex2f( -hsize, hsize );
+      glEnd();
+      glPopMatrix();
+    }
+	  
+  }
+  
+  public ControlInput ci;
+  protected State state;
+  protected State tempState;
   alias state this;
 }
 
 abstract class State
   {
-    this(double X, double Y) @nogc
-    {x = X, y = Y;}
+    this(greal x, greal y) @nogc
+    {this.x = x, this.y = y;}
     
-    ~this() @nogc {} 
+    //~this() @nogc; 
     
-    double x, y;
+    public greal x, y;
     
-    State createUpdate();//{return new State(0, 0);} //Replace new with preallocated memory.
+    State makeUpdate() @nogc;
   }
   
   class Idle : State
   {
-    this(double X, double Y) @nogc
+    this(greal x, greal y) @nogc
     {super(x,y);}
     
-    ~this() @nogc {}
+    //~this() @nogc {}
     
-    override State createUpdate() @nogc
+    override State makeUpdate() @nogc
     {return make!Idle(x,y);} //Replace new with preallocated memory.
   }

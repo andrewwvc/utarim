@@ -31,6 +31,8 @@ struct FreeList(ParentAllocator,
     import m3.Transform : format;
     import std.exception : enforce;
     import std.traits : hasMember;
+    debug
+      import core.stdc.stdio;
 
     static assert(minSize != unbounded, "Use minSize = 0 for no low bound.");
     static assert(maxSize >= (void*).sizeof,
@@ -142,6 +144,8 @@ struct FreeList(ParentAllocator,
 
     private bool freeListEligible(size_t n) const @nogc
     {
+	
+	
         static if (unchecked)
         {
             return true;
@@ -153,9 +157,15 @@ struct FreeList(ParentAllocator,
                 if (!n) return false;
             }
             static if (minSize == maxSize && minSize != chooseAtRuntime)
-                return n == maxSize;
+            {
+	      debug printf("%p ms:%i\n", root, n == maxSize);
+	      return n == maxSize;
+	    }
             else
-                return !tooSmall(n) && !tooLarge(n);
+            {
+	      debug printf("%p sl:%i\n", root, !tooSmall(n) && !tooLarge(n));
+	      return !tooSmall(n) && !tooLarge(n);
+	    }
         }
     }
 
@@ -304,7 +314,8 @@ struct FreeList(ParentAllocator,
     Postcondition: $(D result.length == bytes || result is null)
     */
     void[] allocate(size_t n) @nogc
-    {
+    {	
+	debug printf("all:%i\n", n);
         static if (adaptive == Yes.adaptive) ++accumSamples;
         assert(n < size_t.max / 2);
         // fast path
@@ -341,6 +352,7 @@ struct FreeList(ParentAllocator,
     */
     bool deallocate(void[] block) @nogc
     {
+	debug printf("deall:%i\n", block.length);
         if (freeListEligible(block.length))
         {
             if (min == 0)

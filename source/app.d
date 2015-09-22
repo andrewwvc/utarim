@@ -197,31 +197,16 @@ void realtime() @nogc
 // 	  {
 // 	  	glColor4f(1.0f, 0.8f, 0.0f, 1.0f);
 // 	  }
-// 	  
-// 	  if (gGameControllers[0])
-// 	  {
-// 	    if (SDL_JoystickGetButton(gGameControllers[0], 0))
-// 	    {
-// 	      glColor4f(1.0f, 0.8f, 0.0f, 1.0f);
-// 	    }
-// 	    
-// 	    if (SDL_JoystickGetAxis(gGameControllers[0], 0) > 10000)
-// 	    {
-// 	      glColor4f(0.0f, 0.85f, 0.0f, 1.0f);
-// 	      //SDL_SetRenderDrawColor(gRenderer, 0x00, 0xCC, 0x00, 0xFF);
-// 	    }
-// 	    
-// 	  }
 	  
 	  setButtons(0, 0);
 	  setButtons(1, 1);
 	  
 	  gameUpdate();
-	  
 	  //Clear color buffer
 	  glClear( GL_COLOR_BUFFER_BIT );
 	  
 	  renderFighters();
+	  
 	  
 	  SDL_GL_SwapWindow( gWindow );
 	}
@@ -277,9 +262,9 @@ void setButtons(int playerNum, int controlNum) @nogc
     with(Players[playerNum].ci)
     {
       int numButtons = SDL_JoystickNumButtons(gGameControllers[controlNum]);
-      for (int ii = 0; ii < buttons.length ; ii++)
+      foreach (int ii, ref bool button; buttons)
 	if (ii < numButtons)
-	  buttons[ii] = 0 != SDL_JoystickGetButton(gGameControllers[controlNum], ii);
+	  button = 0 != SDL_JoystickGetButton(gGameControllers[controlNum], ii);
     }
   }
 }
@@ -316,7 +301,7 @@ class Fighter
   void createUpdate() @nogc
   {
     if (tempState) breakState(tempState);
-    tempState = state.makeUpdate();
+    tempState = state.makeUpdate(this);
   }
   void swapUpdate() @nogc
   {
@@ -360,23 +345,13 @@ class Fighter
   alias state this;
 }
 
-// template isDerivedClass(B, D)
-//   if (is(B == class) && is (D == class))
-//  {
-//   static if (is (B : D))
-//     enum isDerivedClass = true;
-//     else
-//     {
-//       enum isDerivedClass = (staticIndexOf!(B, BaseClassesTuple!(D)) > -1);
-//     }
-//  }
-
 import allocator.building_blocks.free_list;
 import allocator.mallocator;
 import std.traits;
 
-const size_t maxStateSize = Idle.sizeof;
-FreeList!(Mallocator, State.sizeof, maxStateSize) stateFreeList;
+const size_t minStateSize = SizeOf!(Idle);
+const size_t maxStateSize = SizeOf!(Duck);
+FreeList!(Mallocator, minStateSize, maxStateSize) stateFreeList;
 
 @nogc
 auto makeState(T, Args...)(auto ref Args args) if (is(T : State))
@@ -387,6 +362,8 @@ auto makeState(T, Args...)(auto ref Args args) if (is(T : State))
   return emplace!(T)(mem, args);
 }
 
+//(state.classinfo.init.length)
+
 @nogc
 void breakState(State state)
 {
@@ -394,30 +371,45 @@ void breakState(State state)
   {
     static if (__traits(hasMember, State, "__dtor"))
 	      state.__dtor();
-    stateFreeList.deallocate((cast(ubyte*)state)[0..state.sizeof]);
+    stateFreeList.deallocate((cast(ubyte*)state)[0..(state.classinfo.init.length)]);
     state = null;
   }
 }
 
 abstract class State
+{
+  this(greal x, greal y) @nogc
+  {this.x = x, this.y = y;}
+  
+  //~this() @nogc;
+  
+  public greal x, y;
+  
+  State makeUpdate(Fighter parent) @nogc;
+}
+
+class Idle : State
+{
+  this(greal x, greal y) @nogc
+  {super(x,y);}
+  
+  //~this() @nogc {}
+  
+  override State makeUpdate(Fighter parent) @nogc
   {
-    this(greal x, greal y) @nogc
-    {this.x = x, this.y = y;}
-    
-    //~this() @nogc;
-    
-    public greal x, y;
-    
-    State makeUpdate() @nogc;
+    return makeState!Idle(x,y);
+  }
+}
+
+class Duck : State
+{
+  this(greal x, greal y) @nogc
+  {super(x,y);}
+  
+  override State makeUpdate(Fighter parent) @nogc
+  {
+    return makeState!Duck(x,y);
   }
   
-  class Idle : State
-  {
-    this(greal x, greal y) @nogc
-    {super(x,y);}
-    
-    //~this() @nogc {}
-    
-    override State makeUpdate() @nogc
-    {return makeState!Idle(x,y);} //Replace new with preallocated memory.
-  }
+  double[10] weights;
+}

@@ -237,8 +237,8 @@ Fighter[2] Players;
 
 void setupGame() @nogc
 {
-  P1 = make!Fighter(make!Idle(-10.0, 0.0));
-  P2 = make!Fighter(make!Idle(10.0, 0.0));
+  P1 = make!Fighter(makeState!Idle(-10.0, 0.0));
+  P2 = make!Fighter(makeState!Idle(10.0, 0.0));
   Players[0] = P1;
   Players[1] = P2;
 }
@@ -301,10 +301,10 @@ class Fighter
     {
       //state should never be null
       assert(state);
-      destruct(state);
+      breakState(state);
 	
       if(tempState)
-	destruct(tempState);
+	breakState(tempState);
     }
   
 //   class Tech
@@ -315,7 +315,7 @@ class Fighter
   
   void createUpdate() @nogc
   {
-    if (tempState) destruct(tempState);
+    if (tempState) breakState(tempState);
     tempState = state.makeUpdate();
   }
   void swapUpdate() @nogc
@@ -324,7 +324,7 @@ class Fighter
     assert(state);
     if (tempState)
     {
-      destruct(state);
+      breakState(state);
       state = tempState;
       tempState = null;
     }
@@ -378,6 +378,7 @@ import std.traits;
 const size_t maxStateSize = Idle.sizeof;
 FreeList!(Mallocator, State.sizeof, maxStateSize) stateFreeList;
 
+@nogc
 auto makeState(T, Args...)(auto ref Args args) if (is(T : State))
 {
   //enum size_t SIZE = SizeOf!(T);
@@ -386,6 +387,7 @@ auto makeState(T, Args...)(auto ref Args args) if (is(T : State))
   return emplace!(T)(mem, args);
 }
 
+@nogc
 void breakState(State state)
 {
   if (state)
@@ -417,5 +419,5 @@ abstract class State
     //~this() @nogc {}
     
     override State makeUpdate() @nogc
-    {return make!Idle(x,y);} //Replace new with preallocated memory.
+    {return makeState!Idle(x,y);} //Replace new with preallocated memory.
   }

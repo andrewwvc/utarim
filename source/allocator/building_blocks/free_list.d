@@ -280,9 +280,11 @@ struct FreeList(ParentAllocator,
             alias toAllocate = bytes;
         }
         assert(toAllocate == max || max == unbounded);
-        auto result = parent.allocate(bytes);
+        //Altered this line, suspected major BUG! Replaced bytes with toAllocate
+        auto result = parent.allocate(toAllocate); //This should allocate enough for any eligible size
         static if (hasTolerance)
         {
+	    
             if (result) result = result.ptr[0 .. bytes];
         }
         static if (adaptive == Yes.adaptive)
@@ -405,7 +407,6 @@ unittest
     FreeList!(GCAllocator, 0, 8) fl;
     assert(fl.root is null);
     auto b1 = fl.allocate(7);
-    //assert(fl._root !is null);
     fl.allocate(8);
     assert(fl.root is null);
     fl.deallocate(b1);

@@ -4,6 +4,9 @@ import derelict.sdl2.sdl;
 import derelict.opengl3.gl;
 import m3.m3;
 
+import allocator.building_blocks.free_list;
+import allocator.mallocator;
+import std.traits;
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
@@ -156,6 +159,10 @@ void realtime() @nogc
 	  
 	setupGame();
 	
+	FreeList!(Mallocator, 2, 200) lista;
+	lista.allocate(3);
+	lista.allocate(3);
+	
       
 	//While application is running
 	while( !quit )
@@ -206,7 +213,6 @@ void realtime() @nogc
 	  glClear( GL_COLOR_BUFFER_BIT );
 	  
 	  renderFighters();
-	  
 	  
 	  SDL_GL_SwapWindow( gWindow );
 	}
@@ -340,18 +346,19 @@ class Fighter
   }
   
   public ControlInput ci;
+  public ControlInput pi; //Previous input
   protected State state;
   protected State tempState;
   alias state this;
 }
 
-import allocator.building_blocks.free_list;
-import allocator.mallocator;
-import std.traits;
+
 
 const size_t minStateSize = SizeOf!(Idle);
 const size_t maxStateSize = SizeOf!(Duck);
 FreeList!(Mallocator, minStateSize, maxStateSize) stateFreeList;
+
+
 
 @nogc
 auto makeState(T, Args...)(auto ref Args args) if (is(T : State))
@@ -397,7 +404,11 @@ class Idle : State
   
   override State makeUpdate(Fighter parent) @nogc
   {
-    return makeState!Idle(x,y);
+    debug printf("Idle\n");
+    if (parent.ci.buttons[0])
+      return makeState!Duck(x,y);
+    else
+      return makeState!Idle(x,y);
   }
 }
 
@@ -408,7 +419,11 @@ class Duck : State
   
   override State makeUpdate(Fighter parent) @nogc
   {
-    return makeState!Duck(x,y);
+    debug printf("Duck\n");
+    if (parent.ci.buttons[1])
+      return makeState!Idle(x,y);
+    else
+      return makeState!Duck(x,y);
   }
   
   double[10] weights;

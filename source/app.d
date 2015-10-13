@@ -32,7 +32,32 @@ GLuint gIBO = 0;
 //skeletons
 Display display1;
 
-alias greal = float;
+alias float greal;
+alias greal[16] GlMatrix;
+
+void setupSkelGL()
+{
+    uint height = SCREEN_HEIGHT;
+    uint width = SCREEN_WIDTH;
+    uint bitsPerPixel= 24;
+    float fov = 90;
+    float nearPlane = 0.1f;
+    float farPlane = 100.0f;
+
+    //glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    //glDepthFunc(GL_LEQUAL);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    //gluPerspective(fov, cast(float)height / width, nearPlane, farPlane);
+    GlMatrix matrix;
+    glhPerspectivef2(matrix, fov, cast(float)height / cast(float)width, nearPlane, farPlane);
+    printf("%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n", matrix[0], matrix[1], matrix[2], matrix[3],  matrix[4], matrix[5], matrix[6], matrix[7],
+    matrix[8], matrix[9], matrix[10], matrix[11],  matrix[12], matrix[13], matrix[14], matrix[15],);
+    glLoadMatrixf(matrix.ptr);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+}
 
 //Globals
 SDL_Joystick*[2] gGameControllers;
@@ -120,12 +145,14 @@ void main()
 	//Skeleto/shaders setup
 	setupCube();
 	
-	createShaders();
+	Display.createShaders();
 	
 	display1 = new Display();
 	
+	setupSkelGL();
+	
 	//Initialize Projection Matrix
-	glMatrixMode( GL_PROJECTION ); glLoadIdentity();
+	glMatrixMode( GL_PROJECTION ); //glLoadIdentity();
 	//Check for error
 	error = glGetError();
 	if( error != GL_NO_ERROR )
@@ -224,10 +251,14 @@ void realtime() @nogc
 	  setButtons(1, 1);
 	  
 	  gameUpdate();
+	  display1.update(0.0);
 	  //Clear color buffer
 	  glClear( GL_COLOR_BUFFER_BIT );
 	  
+	  mProgram.useFixed();
 	  renderFighters();
+	  mProgram.use();
+	  display1.render();
 	  
 	  SDL_GL_SwapWindow( gWindow );
 	}
@@ -345,7 +376,7 @@ class Fighter
       const greal hsize = 8.0f/2.0f;
       glPushMatrix();
       glScalef(0.05f, 0.05f, 0.05f);
-      glTranslatef(cast(float)x, cast(float)y, 0.0f);
+      glTranslatef(cast(float)x, cast(float)y, -20.0f);
       glBegin( GL_QUADS );
       glColor4f(ci.buttons[0] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
       glVertex2f( -hsize, -hsize );

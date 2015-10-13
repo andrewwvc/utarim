@@ -3,6 +3,9 @@ import core.memory;
 import derelict.sdl2.sdl;
 import derelict.opengl3.gl;
 import m3.m3;
+import vmath;
+import skeleton;
+import shaders;
 
 import allocator.building_blocks.free_list;
 import allocator.mallocator;
@@ -25,6 +28,9 @@ GLuint gProgramID = 0;
 GLint gVertexPos2DLocation = -1;
 GLuint gVBO = 0;
 GLuint gIBO = 0;
+
+//skeletons
+Display display1;
 
 alias greal = float;
 
@@ -109,6 +115,15 @@ void main()
 	//  { printf( "Unable to initialize OpenGL!\n" ); return; }
 	  
 	GLenum error = GL_NO_ERROR;
+	
+	
+	//Skeleto/shaders setup
+	setupCube();
+	
+	createShaders();
+	
+	display1 = new Display();
+	
 	//Initialize Projection Matrix
 	glMatrixMode( GL_PROJECTION ); glLoadIdentity();
 	//Check for error
@@ -279,6 +294,7 @@ struct hittri
 {
   
 }
+
 
 class Fighter
 {

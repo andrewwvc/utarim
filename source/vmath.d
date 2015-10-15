@@ -1,0 +1,264 @@
+module vmath;
+
+private
+{
+	import std.stdio;
+	import std.string;
+	import std.math;
+	import std.traits;
+	import std.conv;
+}
+
+const float TAU = 2.0*PI;
+
+struct Vec3
+{
+    real x=0;
+    real y=0;
+    real z=0;
+
+    string toString()
+    {
+        return format("V[",x,", ",y,", ",z,"]");
+    }
+    
+    @nogc
+    Vec3 opUnary(string op)()  if (op == "-") { return Vec3(-x, -y, -z); }
+    
+    @nogc
+    Vec3 opBinary(string op)(Vec3 rhs) if (op == "+")
+    {return Vec3(x+rhs.x, y+rhs.y, z+rhs.z);}
+
+    @nogc
+    Vec3 opBinary(string op)(Vec3 rhs) if (op == "-")
+    {return Vec3(x-rhs.x, y-rhs.y, z-rhs.z);}
+
+    @nogc
+    Vec3 cross(Vec3 rhs)
+    {
+        return Vec3(y*rhs.z - z*rhs.y,
+                    z*rhs.x - x*rhs.z,
+                    x*rhs.y - y*rhs.x);
+    }
+
+    @nogc
+    Vec3 mult(real mul)
+    {
+        return Vec3(x*mul, y*mul, z*mul);
+    }
+
+    @nogc
+    Vec3 opBinary(string op)(Quart rhs) if (op == "*")
+    {
+        Quart t = Quart(0,x, y, z);
+        t = rhs*t*rhs.conj();
+        return Vec3(t.i, t.j, t.k);
+    }
+
+    @nogc
+    Vec3 div(real den)
+    {
+        return mult(1/den);
+    }
+
+    @nogc
+    real dot(Vec3 rhs)
+    {
+        return x*rhs.x +y*rhs.y +z*rhs.z;
+    }
+
+    @nogc
+    real lengthSqr()
+    {
+        return x*x+y*y+z*z;
+    }
+
+    @nogc
+    real length()
+    {
+        return sqrt(lengthSqr());
+    }
+
+    @nogc
+    real norm()
+    {
+        return length();
+    }
+
+    //Returns the normalised unit Vector
+    @nogc
+    Vec3 normalise()
+    {
+        real normInv = 1/length();
+        return Vec3(x*normInv, y*normInv, z*normInv);
+    }
+
+    @nogc
+    auto opBinary(string op)(real mul)
+    {
+        static if (op == "*")
+            return mult(mul);
+    }
+}
+
+struct Quart
+{
+    public real w=0.0;
+    public real i=0.0;
+    public real j=0.0;
+    public real k=0.0;
+
+    @nogc
+    this(real W, real I, real J, real K)
+    {
+        w= W;
+        i=I;
+        j=J;
+        k=K;
+    }
+
+    @nogc
+    this(Vec3 v)
+    {
+        w=0;
+        i=v.x;
+        j=v.y;
+        k=v.z;
+    }
+
+    string toString()
+    {
+        return format("Q[",w,", ",i,", ",j,", ",k,"]");
+    }
+
+    @nogc
+    Quart opUnary(string op)() if (op == "-") { return Quart(-w,-i,-j,-k); }
+    
+    @nogc
+    Quart opBinary(string op)(Quart rhs) if (op == "*")
+    {
+        return Quart(w*rhs.w-i*rhs.i-j*rhs.j-k*rhs.k,
+                     w*rhs.i+i*rhs.w+j*rhs.k-k*rhs.j,
+                     w*rhs.j+j*rhs.w+k*rhs.i-i*rhs.k,
+                     w*rhs.k+k*rhs.w+i*rhs.j-j*rhs.i);
+    }
+
+    @nogc
+    Quart opBinary(string op)(Quart rhs) if (op == "/")
+    {
+        return this*conj(rhs);
+    }
+
+    @nogc
+    Quart opBinary(string op)(Quart rhs) if (op == "+")
+    {return Quart(w+rhs.w,
+                     i+rhs.i,
+                     j+rhs.j,
+                     k+rhs.k);}
+
+    @nogc
+    Quart opBinary(string op)(Quart rhs) if (op == "-")
+    {return Quart(w-rhs.w,
+                     i-rhs.i,
+                     j-rhs.j,
+                     k-rhs.k);}
+
+    @nogc                 
+    real normSqr()
+    {
+        return w*w+i*i+j*j+k*k;
+    }
+
+    @nogc
+    real norm()
+    {
+        return sqrt(normSqr());
+    }
+
+    //Returns the normalised unit quarternion
+    @nogc
+    Quart normalise()
+    {
+        real normInv = 1/norm();
+        return Quart(w*normInv, i*normInv, j*normInv, k*normInv);
+    }
+
+    //The quarternion conjugate
+    @nogc
+    Quart conj()
+    {
+        return Quart(w,-i,-j,-k);
+    }
+
+    @nogc
+    auto opBinary(string op)(real val)
+    {
+        static if (op == "*")
+            return Quart(w*val, i*val, j*val, k*val);
+        else static if (op == "+" || op == "-")
+            return mixin("Quart(w"~op~"val, i, j, k)");
+    }
+
+    @nogc
+    auto opBinaryRight(string op)(real val)
+    {
+        static if (op == "+" || op == "*")
+            return  mixin("this"~op~"val");
+    }
+
+    //This only works for unit quaternions!
+    @nogc
+    Quart pow(real val)
+    {
+        real vecabs = i*i+j*j+k*k;
+        real a,b,c;
+
+        if (vecabs != 0)
+        {
+            vecabs = 1/sqrt(vecabs);
+            a = i*vecabs;
+            b = j*vecabs;
+            c = k*vecabs;
+        }
+        else
+        {
+            return Quart(1,0,0,0);
+        }
+
+        creal theta = expi(acos(w)*val);
+        return Quart(theta.re, theta.im*a, theta.im*b, theta.im*c);
+    }
+}
+
+//NOTE: x^2+y^2+z^2 must equal 1
+@nogc
+Quart rotationQuart(real theta, real x, real y, real z)
+{
+    return Quart(cos(theta/2), x*sin(theta/2), y*sin(theta/2), z*sin(theta/2));
+}
+
+@nogc
+Quart rotationQuart(real theta, Vec3 vec)
+{
+    return rotationQuart(theta, vec.x, vec.y, vec.z);
+}
+
+unittest
+{
+    Quart q1 = Quart(0.0, 0.0, 1.0, 0.0);
+	Quart qt = Quart(0.0, 1.0, 0.0, 0.0);
+	Quart q2 = q1*qt;
+	writeln(q2);
+	q2 = qt*q1;
+	writeln(q2);
+	qt = q1+2*q1;
+	writeln(qt);
+	Vec3 v1 = Vec3(2,2,2)*qt;
+	writeln(v1);
+
+	real theta = TAU;
+	Quart point = Quart(0, 0, 0, 1);
+	Quart rot = Quart(cos(theta/2), sin(theta/2), 0, 0);
+	Quart result = rot*point*rot.conj;
+	writeln(result);
+} 

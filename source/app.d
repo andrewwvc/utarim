@@ -6,6 +6,7 @@ import m3.m3;
 import vmath;
 import skeleton;
 import shaders;
+import core.time;
 
 import allocator.building_blocks.free_list;
 import allocator.mallocator;
@@ -30,7 +31,7 @@ GLuint gVBO = 0;
 GLuint gIBO = 0;
 
 //skeletons
-Display display1;
+ManBody man1, man2;
 
 alias float greal;
 alias greal[16] GlMatrix;
@@ -52,7 +53,7 @@ void setupSkelGL()
     //gluPerspective(fov, cast(float)height / width, nearPlane, farPlane);
     GlMatrix matrix;
     glhPerspectivef2(matrix, fov, cast(float)height / cast(float)width, nearPlane, farPlane);
-    printf("%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n", matrix[0], matrix[1], matrix[2], matrix[3],  matrix[4], matrix[5], matrix[6], matrix[7],
+    debug printf("%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n", matrix[0], matrix[1], matrix[2], matrix[3],  matrix[4], matrix[5], matrix[6], matrix[7],
     matrix[8], matrix[9], matrix[10], matrix[11],  matrix[12], matrix[13], matrix[14], matrix[15],);
     glLoadMatrixf(matrix.ptr);
     glMatrixMode(GL_MODELVIEW);
@@ -121,7 +122,7 @@ void main()
 	SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 1 );
 	
 	//Create window
-	gWindow = SDL_CreateWindow( "SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN );
+	gWindow = SDL_CreateWindow("Utarim", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN );
 	if( gWindow == null )
 	  {printf( "Window could not be created! SDL Error: %s\n", SDL_GetError()); return;}
 	scope(exit) SDL_DestroyWindow(gWindow);
@@ -145,9 +146,9 @@ void main()
 	//Skeleto/shaders setup
 	setupCube();
 	
-	Display.createShaders();
-	
-	display1 = new Display();
+	ManBody.createShaders();
+	man1 = new ManBody();
+	man2 = new ManBody();
 	
 	setupSkelGL();
 	
@@ -205,6 +206,10 @@ void realtime() @nogc
 	lista.allocate(3);
 	lista.allocate(3);
 	
+	
+	TickDuration lastTime = TickDuration.currSystemTick();
+	TickDuration newTime;
+	TickDuration dt;
       
 	//While application is running
 	while( !quit )
@@ -246,19 +251,33 @@ void realtime() @nogc
 // 	  {
 // 	  	glColor4f(1.0f, 0.8f, 0.0f, 1.0f);
 // 	  }
+
+	  //Time update
+	  newTime = TickDuration.currSystemTick();
+	  dt = newTime - lastTime;
+	  lastTime = newTime;
 	  
 	  setButtons(0, 0);
 	  setButtons(1, 1);
 	  
 	  gameUpdate();
-	  display1.update(0.0);
+	  
 	  //Clear color buffer
 	  glClear( GL_COLOR_BUFFER_BIT );
+	  glMatrixMode(GL_MODELVIEW);
 	  
 	  mProgram.useFixed();
 	  renderFighters();
 	  mProgram.use();
-	  display1.render();
+	  glPushMatrix();
+	    glTranslatef(0.0,0.0,-10);
+	    man1.update(dt.length / cast(double)TickDuration.ticksPerSec);
+	    man1.render();
+	    man2.update(0.03);
+	    glTranslatef(5.0f, 1.0f, -2.0f);
+	    man2.render();
+	    glTranslatef(-5.0f, -1.0f, 2.0f);
+	  glPopMatrix();
 	  
 	  SDL_GL_SwapWindow( gWindow );
 	}
@@ -375,18 +394,18 @@ class Fighter
     {
       const greal hsize = 8.0f/2.0f;
       glPushMatrix();
-      glScalef(0.05f, 0.05f, 0.05f);
-      glTranslatef(cast(float)x, cast(float)y, -20.0f);
-      glBegin( GL_QUADS );
-      glColor4f(ci.buttons[0] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-      glVertex2f( -hsize, -hsize );
-      glColor4f(ci.buttons[1] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-      glVertex2f( hsize, -hsize );
-      glColor4f(ci.buttons[2] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-      glVertex2f( hsize, hsize );
-      glColor4f(ci.buttons[3] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-      glVertex2f( -hsize, hsize );
-      glEnd();
+	glScalef(0.05f, 0.05f, 0.05f);
+	glTranslatef(cast(float)x, cast(float)y, -20.0f);
+	glBegin( GL_QUADS );
+	glColor4f(ci.buttons[0] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+	glVertex2f( -hsize, -hsize );
+	glColor4f(ci.buttons[1] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+	glVertex2f( hsize, -hsize );
+	glColor4f(ci.buttons[2] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+	glVertex2f( hsize, hsize );
+	glColor4f(ci.buttons[3] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+	glVertex2f( -hsize, hsize );
+	glEnd();
       glPopMatrix();
     }
 	  
@@ -451,7 +470,7 @@ class Idle : State
   
   override State makeUpdate(Fighter parent) @nogc
   {
-    debug printf("Idle\n");
+    //debug printf("Idle\n");
     if (parent.ci.buttons[0])
       return makeState!Duck(x,y);
     else
@@ -466,7 +485,7 @@ class Duck : State
   
   override State makeUpdate(Fighter parent) @nogc
   {
-    debug printf("Duck\n");
+    //debug printf("Duck\n");
     if (parent.ci.buttons[1])
       return makeState!Idle(x,y);
     else

@@ -24,11 +24,19 @@ def relToParent(pb):
     #return mathutils.Matrix()
     return boneTailMatrix(pb.parent).inverted()*pb.matrix
 
+def relMatrix(pb):
+    par = pb.parent
+    if par is None:
+        return pose_bone.matrix
+    else:
+        return relToParent(pb)
+
 f = open(os.path.join(basedir, "skelcap") + ".txt", 'w', encoding='utf-8')
 
 f.write(str(len(armature.pose.bones))+'\n')
 
-# Loop through every post bone and colwrite the data from each one
+scene.frame_set(0)
+# Loop through every pose bone and write the data from each one
 for pose_bone in pose_bones:
     f.write(pose_bone.name+'\n')
     f.write(str(pose_bone.length)+'\n')
@@ -44,8 +52,9 @@ for pose_bone in pose_bones:
         #offsetVec = relMatrix.translation
         offsetVec = mathutils.Vector((0.0, 0.0, 0.0))
     #write offset NOTE: Currently assumes no offset for child bones
-    f.write(str(offsetVec.x)+'\n'+str(offsetVec.y)+'\n'+str(offsetVec.z)+'\n')
-    f.write('['+str(pose_bone.matrix.to_quaternion().w) +', '+ str(pose_bone.matrix.to_quaternion().x) +', '+ str(pose_bone.matrix.to_quaternion().y) +', '+ str(pose_bone.matrix.to_quaternion().z)+']\n')
+    f.write('['+str(offsetVec.x)+', '+str(offsetVec.y)+', '+str(offsetVec.z)+']\n')
+    rotQuat = relMatrix.to_quaternion()
+    f.write('['+str(rotQuat.w) +', '+ str(rotQuat.x) +', '+ str(rotQuat.y) +', '+ str(rotQuat.z)+']\n')
     f.write('<\n')
     for bone in pose_bone.children:
         f.write(str(list(pose_bones).index(bone))+'\n')

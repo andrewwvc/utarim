@@ -5,7 +5,7 @@ import derelict.opengl3.gl;
 import m3.m3;
 import vmath;
 import skeleton;
-import shaders;
+import manbody;
 import core.time;
 
 import allocator.building_blocks.free_list;
@@ -32,9 +32,6 @@ GLuint gIBO = 0;
 
 //skeletons
 ManBody man1, man2;
-
-alias float greal;
-alias greal[16] GlMatrix;
 
 void setupSkelGL()
 {
@@ -102,7 +99,8 @@ void takedownControllers() @nogc
 }
 
 
-
+Skeleton testSkel;
+Quat[][] testAnim;
 
 void main()
 {
@@ -151,6 +149,9 @@ void main()
 	man2 = new ManBody();
 	
 	setupSkelGL();
+	
+	testSkel = makeSkeletonFile("./blend/skelcap.txt");
+	testAnim = makeAnimationFile(testSkel, "./blend/animcap.txt");
 	
 	//Initialize Projection Matrix
 	glMatrixMode( GL_PROJECTION ); //glLoadIdentity();
@@ -266,9 +267,11 @@ void realtime() @nogc
 	  glClear( GL_COLOR_BUFFER_BIT );
 	  glMatrixMode(GL_MODELVIEW);
 	  
-	  mProgram.useFixed();
+	  //mProgram.useFixed();
+	  glUseProgram(0);
 	  renderFighters();
-	  mProgram.use();
+	  //mProgram.use();
+	  ManBody.useShaderProgram();
 	  glPushMatrix();
 	    glTranslatef(0.0,0.0,-10);
 	    man1.update(dt.length / cast(double)TickDuration.ticksPerSec);
@@ -277,6 +280,8 @@ void realtime() @nogc
 	    glTranslatef(5.0f, 1.0f, -2.0f);
 	    man2.render();
 	    glTranslatef(-5.0f, -1.0f, 2.0f);
+	    drawSkeletonMesh(testSkel, testAnim, 3.0);
+	    
 	  glPopMatrix();
 	  
 	  SDL_GL_SwapWindow( gWindow );

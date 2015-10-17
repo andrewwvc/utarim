@@ -1,5 +1,3 @@
-module skeleton;
-
 import derelict.sdl2.sdl;
 import derelict.opengl3.gl;
 import vmath;
@@ -14,10 +12,10 @@ const int MAX_BONE_CHILDREN = 8;
 
 struct Bone
 {
-    Quart qRotate;
+    Quat qRotate;
     Vec3 vOffset;
     //real fHingeAngle, fMin, fMax; //For inverse kinematics
-    real fLength;
+    greal fLength;
     int nJointType;
     int[MAX_BONE_CHILDREN] Child;
     int Parent;
@@ -33,59 +31,122 @@ struct Skeleton
 Skeleton makeSkeletonFile(string filename)
 {
     Skeleton skl;
-
-    auto handle = File(filename, "r");
+    
+    int currentBone = 0;
     string lineBuffer;
+    
+    try
+    {
+    auto handle = File(filename, "r");
 
     lineBuffer = handle.readln();
     int noBones = parse!int(lineBuffer);
-    int currentBone = 0;
 
     skl.bones = new Bone[noBones];
-
+    
     //while("!!!" != (nameBuffer))
     while(null != (lineBuffer = handle.readln()) && currentBone < noBones)
     {
-        with (skl.bones[currentBone])
-        {
+	with (skl.bones[currentBone])
+	{
 
 
-            sName = lineBuffer;
-            lineBuffer = handle.readln();
-            fLength = parse!real(lineBuffer);
-            lineBuffer = handle.readln();
-            Parent =  parse!int(lineBuffer);
-
-            //Parse offset
-            lineBuffer = handle.readln();
-	    vOffset[0] = parse!real(lineBuffer);
+	    sName = lineBuffer;
 	    lineBuffer = handle.readln();
-	    vOffset[1] = parse!real(lineBuffer);
+	    debug writeln("lb: ", lineBuffer);
+	    fLength = parse!double(lineBuffer);
 	    lineBuffer = handle.readln();
-	    vOffset[2] = parse!real(lineBuffer);
+	    debug writeln("lb: ", lineBuffer);
+	    Parent =  parse!int(lineBuffer);
 
-            lineBuffer = handle.readln(); //Reads the line with the '<' character.
-            lineBuffer = handle.readln(); //Reads the first Child value.
-            int childNo = 0;
-            while (lineBuffer[0] != '>')
-            {
-                //Children will coninue to be read as long as they do no exceed the maximum permissable number of bone children.
-                if (childNo < MAX_BONE_CHILDREN)
-                {
-                    Child[childNo] = parse!int(lineBuffer);
-                    ++childNo;
-                }
-                else
-                    throw new Exception(format("Maximum number of bone children exceeded. File: ", filename, " Bone Number: ", currentBone));
+	    //Parse offset
+	    lineBuffer = handle.readln();
+	    auto vArray = parse!(double[3])(lineBuffer);
+	    vOffset.x = vArray[0];
+	    vOffset.y = vArray[1];
+	    vOffset.z = vArray[2];
+	    
+	    //Parse rotation quaternion
+	    lineBuffer = handle.readln();
+	    auto qArray = parse!(double[4])(lineBuffer);
+	    qRotate.w = qArray[0];
+	    qRotate.i = qArray[1];
+	    qRotate.j = qArray[2];
+	    qRotate.k = qArray[3];
 
-                lineBuffer = handle.readln(); //Advances the input untill a line saring with '>' is read.
-            }
+	    lineBuffer = handle.readln(); //Reads the line with the '<' character.
+	    lineBuffer = handle.readln(); //Reads the first Child value.
+	    int childNo = 0;
+	    while (lineBuffer[0] != '>')
+	    {
+		//Children will coninue to be read as long as they do no exceed the maximum permissable number of bone children.
+		if (childNo < MAX_BONE_CHILDREN)
+		{
+		    Child[childNo] = parse!int(lineBuffer);
+		    ++childNo;
+		}
+		else
+		    throw new Exception(format("Maximum number of bone children exceeded. File: ", filename, " Bone Number: ", currentBone));
 
-            ++currentBone;
-        }
+		lineBuffer = handle.readln(); //Advances the input untill a line starting with '>' is read.
+	    }
+
+	    ++currentBone;
+	}
+      }
+    }
+    catch (Exception e)
+    {
+      debug writeln("currentBone: ", currentBone, "\nname: ", skl.bones[currentBone].sName, "\nlb: ", lineBuffer);
+      throw e;
     }
 
     return skl;
+}
+
+Quat[][] makeAnimationFile(Skeleton skl, string filename)
+{
+    Quat[][] animation;
+    
+    auto handle = File(filename, "r");
+    string lineBuffer;
+    
+    lineBuffer = handle.readln();
+    int noBones = parse!(int)(lineBuffer);
+    lineBuffer = handle.readln();
+    int noFrames = parse!(int)(lineBuffer);
+    
+    animation = new Quat[][](noBones, noFrames);
+    
+    int currentFrame = 0;
+
+    while(null != (lineBuffer = handle.readln()))
+    {
+      for (int boneNo = 0; boneNo < noBones; ++boneNo)
+      {
+	//Skips the number lineBuffer
+	handle.readln();
+	
+	lineBuffer = handle.readln();
+	auto qArray = parse!(double[4])(lineBuffer);
+	with (animation[boneNo][currentFrame])
+	{
+	  w = qArray[0];
+	  i = qArray[1];
+	  j = qArray[2];
+	  k = qArray[3];
+	}
+      }
+      
+      //Skips the closing square bracket
+      lineBuffer = handle.readln();
+      if (']' != lineBuffer[0])
+	throw new Exception("Closing square bracket misplaced");
+	
+      ++currentFrame;
+    }
+    
+    return animation;
 }
 
 Skeleton makePerson()
@@ -96,7 +157,7 @@ Skeleton makePerson()
 
     with(bob.bones[0])
     {
-        qRotate = rotationQuart(0,0,0,1);
+        qRotate = rotationQuat(0,0,0,1);
         vOffset = Vec3(0,3,0);
         fLength = 2;
         Child[0..4] = [1,2,3,6];
@@ -106,7 +167,7 @@ Skeleton makePerson()
 
     with(bob.bones[1])
     {
-        qRotate = rotationQuart(0,0,0,1);
+        qRotate = rotationQuat(0,0,0,1);
         vOffset = Vec3(0,0,0);
         fLength = 1;
         Parent = 0;
@@ -115,7 +176,7 @@ Skeleton makePerson()
 
     with(bob.bones[2])
     {
-        qRotate = rotationQuart(TAU*0.25,0,0,-1);
+        qRotate = rotationQuat(TAU*0.25,0,0,-1);
         vOffset = Vec3(0.5,0,0);
         fLength = 2;
         Child[0] = 4;
@@ -125,7 +186,7 @@ Skeleton makePerson()
 
     with(bob.bones[3])
     {
-        qRotate = rotationQuart(TAU*0.25,0,0,1);
+        qRotate = rotationQuat(TAU*0.25,0,0,1);
         vOffset = Vec3(-0.5,0,0);
         fLength = 2;
         Child[0] = 5;
@@ -135,7 +196,7 @@ Skeleton makePerson()
 
     with(bob.bones[4])
     {
-        qRotate = rotationQuart(TAU*0.25,0,0,-1);
+        qRotate = rotationQuat(TAU*0.25,0,0,-1);
         vOffset = Vec3(0,0,0);
         fLength = 2;
         Parent = 2;
@@ -144,7 +205,7 @@ Skeleton makePerson()
 
     with(bob.bones[5])
     {
-        qRotate = rotationQuart(TAU*0.25,0,0,1);
+        qRotate = rotationQuat(TAU*0.25,0,0,1);
         vOffset = Vec3(0,0,0);
         fLength = 2;
         Parent = 3;
@@ -153,7 +214,7 @@ Skeleton makePerson()
 
     with(bob.bones[6])
     {
-        qRotate = rotationQuart(TAU*0.5,0,0,1);
+        qRotate = rotationQuat(TAU*0.5,0,0,1);
         vOffset = Vec3(0,-2,0);
         fLength = 3;
         Child[0..2] = [7,8];
@@ -163,7 +224,7 @@ Skeleton makePerson()
 
     with(bob.bones[7])
     {
-        qRotate = rotationQuart(0,0,0,1);
+        qRotate = rotationQuat(0,0,0,1);
         vOffset = Vec3(1,0,0);
         fLength = 3;
         Child[0] = 9;
@@ -173,7 +234,7 @@ Skeleton makePerson()
 
     with(bob.bones[8])
     {
-        qRotate = rotationQuart(0,0,0,1);
+        qRotate = rotationQuat(0,0,0,1);
         vOffset = Vec3(-1,0,0);
         fLength = 3;
         Child[0] = 10;
@@ -183,7 +244,7 @@ Skeleton makePerson()
 
     with(bob.bones[9])
     {
-        qRotate = rotationQuart(0,0,0,1);
+        qRotate = rotationQuat(0,0,0,1);
         vOffset = Vec3(0,0,0);
         fLength = 3;
         Parent = 7;
@@ -192,7 +253,7 @@ Skeleton makePerson()
 
     with(bob.bones[10])
     {
-        qRotate = rotationQuart(0,0,0,1);
+        qRotate = rotationQuat(0,0,0,1);
         vOffset = Vec3(0,0,0);
         fLength = 3;
         Parent = 8;
@@ -245,18 +306,18 @@ void setupCube()
 }
 
 
-void drawSkeletonMesh(Skeleton skel, Quart[][] frames, real fvalue, bool loop = false) @nogc
+void drawSkeletonMesh(Skeleton skel, Quat[][] frames, real fvalue, bool loop = false) @nogc
 {
-    void drawBone(int index, Quart[] f, Quart[] g, real interpolation, float col) @nogc
+    void drawBone(int index, Quat[] f, Quat[] g, real interpolation, float col) @nogc
     {
         glColor3f(0.0, col, 1.0-col);
 
         with (skel.bones[index])
         {
             //Generates an interpolation between frames
-            Quart inter_quart = f[index]*(f[index].conj()*g[index]).pow(interpolation);
+            Quat inter_Quat = f[index]*(f[index].conj()*g[index]).pow(interpolation);
 
-            with (inter_quart)
+            with (inter_Quat)
             {
                 auto ii2 = 2*i*i;
                 auto jj2 = 2*j*j;
@@ -267,7 +328,7 @@ void drawSkeletonMesh(Skeleton skel, Quart[][] frames, real fvalue, bool loop = 
                 auto wj2 = 2*w*j;
                 auto jk2 = 2*j*k;
                 auto wi2 = 2*w*i;
-                float[16] mat =
+                GlMatrix mat =
                 [1-jj2-kk2, ij2+wk2,  ki2-wj2,  0,//b.vOffset.i,
                 ij2-wk2,  1-ii2-kk2,  jk2+wi2,  0,//b.vOffset.j,
                 ki2+wj2,  jk2-wi2,  1-ii2-jj2,  0,//b.vOffset.z,
@@ -299,7 +360,7 @@ void drawSkeletonMesh(Skeleton skel, Quart[][] frames, real fvalue, bool loop = 
 
     glMatrixMode(GL_MODELVIEW);
 
-		glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_VERTEX_ARRAY);
         glVertexPointer(3, GL_FLOAT, 0, cubeVerts.ptr);
 
         //glIndexPointer();

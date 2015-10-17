@@ -11,6 +11,10 @@ private
 
 const float TAU = 2.0*PI;
 
+alias float greal;
+alias greal[16] GlMatrix;
+
+
 struct Vec3
 {
     real x=0;
@@ -48,9 +52,9 @@ struct Vec3
     }
 
     @nogc
-    Vec3 opBinary(string op)(Quart rhs) if (op == "*")
+    Vec3 opBinary(string op)(Quat rhs) if (op == "*")
     {
-        Quart t = Quart(0,x, y, z);
+        Quat t = Quat(0,x, y, z);
         t = rhs*t*rhs.conj();
         return Vec3(t.i, t.j, t.k);
     }
@@ -101,7 +105,7 @@ struct Vec3
     }
 }
 
-struct Quart
+struct Quat
 {
     public real w=0.0;
     public real i=0.0;
@@ -132,33 +136,33 @@ struct Quart
     }
 
     @nogc
-    Quart opUnary(string op)() if (op == "-") { return Quart(-w,-i,-j,-k); }
+    Quat opUnary(string op)() if (op == "-") { return Quat(-w,-i,-j,-k); }
     
     @nogc
-    Quart opBinary(string op)(Quart rhs) if (op == "*")
+    Quat opBinary(string op)(Quat rhs) if (op == "*")
     {
-        return Quart(w*rhs.w-i*rhs.i-j*rhs.j-k*rhs.k,
+        return Quat(w*rhs.w-i*rhs.i-j*rhs.j-k*rhs.k,
                      w*rhs.i+i*rhs.w+j*rhs.k-k*rhs.j,
                      w*rhs.j+j*rhs.w+k*rhs.i-i*rhs.k,
                      w*rhs.k+k*rhs.w+i*rhs.j-j*rhs.i);
     }
 
     @nogc
-    Quart opBinary(string op)(Quart rhs) if (op == "/")
+    Quat opBinary(string op)(Quat rhs) if (op == "/")
     {
         return this*conj(rhs);
     }
 
     @nogc
-    Quart opBinary(string op)(Quart rhs) if (op == "+")
-    {return Quart(w+rhs.w,
+    Quat opBinary(string op)(Quat rhs) if (op == "+")
+    {return Quat(w+rhs.w,
                      i+rhs.i,
                      j+rhs.j,
                      k+rhs.k);}
 
     @nogc
-    Quart opBinary(string op)(Quart rhs) if (op == "-")
-    {return Quart(w-rhs.w,
+    Quat opBinary(string op)(Quat rhs) if (op == "-")
+    {return Quat(w-rhs.w,
                      i-rhs.i,
                      j-rhs.j,
                      k-rhs.k);}
@@ -175,28 +179,28 @@ struct Quart
         return sqrt(normSqr());
     }
 
-    //Returns the normalised unit quarternion
+    //Returns the normalised unit Quaternion
     @nogc
-    Quart normalise()
+    Quat normalise()
     {
         real normInv = 1/norm();
-        return Quart(w*normInv, i*normInv, j*normInv, k*normInv);
+        return Quat(w*normInv, i*normInv, j*normInv, k*normInv);
     }
 
-    //The quarternion conjugate
+    //The Quaternion conjugate
     @nogc
-    Quart conj()
+    Quat conj()
     {
-        return Quart(w,-i,-j,-k);
+        return Quat(w,-i,-j,-k);
     }
 
     @nogc
     auto opBinary(string op)(real val)
     {
         static if (op == "*")
-            return Quart(w*val, i*val, j*val, k*val);
+            return Quat(w*val, i*val, j*val, k*val);
         else static if (op == "+" || op == "-")
-            return mixin("Quart(w"~op~"val, i, j, k)");
+            return mixin("Quat(w"~op~"val, i, j, k)");
     }
 
     @nogc
@@ -208,7 +212,7 @@ struct Quart
 
     //This only works for unit quaternions!
     @nogc
-    Quart pow(real val)
+    Quat pow(real val)
     {
         real vecabs = i*i+j*j+k*k;
         real a,b,c;
@@ -222,32 +226,32 @@ struct Quart
         }
         else
         {
-            return Quart(1,0,0,0);
+            return Quat(1,0,0,0);
         }
 
         creal theta = expi(acos(w)*val);
-        return Quart(theta.re, theta.im*a, theta.im*b, theta.im*c);
+        return Quat(theta.re, theta.im*a, theta.im*b, theta.im*c);
     }
 }
 
 //NOTE: x^2+y^2+z^2 must equal 1
 @nogc
-Quart rotationQuart(real theta, real x, real y, real z)
+Quat rotationQuat(real theta, real x, real y, real z)
 {
-    return Quart(cos(theta/2), x*sin(theta/2), y*sin(theta/2), z*sin(theta/2));
+    return Quat(cos(theta/2), x*sin(theta/2), y*sin(theta/2), z*sin(theta/2));
 }
 
 @nogc
-Quart rotationQuart(real theta, Vec3 vec)
+Quat rotationQuat(real theta, Vec3 vec)
 {
-    return rotationQuart(theta, vec.x, vec.y, vec.z);
+    return rotationQuat(theta, vec.x, vec.y, vec.z);
 }
 
 unittest
 {
-    Quart q1 = Quart(0.0, 0.0, 1.0, 0.0);
-	Quart qt = Quart(0.0, 1.0, 0.0, 0.0);
-	Quart q2 = q1*qt;
+    Quat q1 = Quat(0.0, 0.0, 1.0, 0.0);
+	Quat qt = Quat(0.0, 1.0, 0.0, 0.0);
+	Quat q2 = q1*qt;
 	writeln(q2);
 	q2 = qt*q1;
 	writeln(q2);
@@ -257,8 +261,50 @@ unittest
 	writeln(v1);
 
 	real theta = TAU;
-	Quart point = Quart(0, 0, 0, 1);
-	Quart rot = Quart(cos(theta/2), sin(theta/2), 0, 0);
-	Quart result = rot*point*rot.conj;
+	Quat point = Quat(0, 0, 0, 1);
+	Quat rot = Quat(cos(theta/2), sin(theta/2), 0, 0);
+	Quat result = rot*point*rot.conj;
 	writeln(result);
 } 
+
+
+//matrix will receive the calculated perspective matrix.
+//You would have to upload to your shader
+// or use glLoadMatrixf if you aren't using shaders.
+void glhPerspectivef2(ref GlMatrix matrix, float fovyInDegrees, float aspectRatio,
+                      float znear, float zfar) @nogc
+{
+    float ymax, xmax;
+    float temp, temp2, temp3, temp4;
+    ymax = znear * tan(fovyInDegrees * PI / 360.0);
+    //ymin = -ymax;
+    //xmin = -ymax * aspectRatio;
+    xmax = ymax * aspectRatio;
+    glhFrustumf2(matrix, -xmax, xmax, -ymax, ymax, znear, zfar);
+}
+
+void glhFrustumf2(ref GlMatrix matrix, float left, float right, float bottom, float top,
+                  float znear, float zfar) @nogc
+{
+    float temp, temp2, temp3, temp4;
+    temp = 2.0 * znear;
+    temp2 = right - left;
+    temp3 = top - bottom;
+    temp4 = zfar - znear;
+    matrix[0] = temp / temp2;
+    matrix[1] = 0.0;
+    matrix[2] = 0.0;
+    matrix[3] = 0.0;
+    matrix[4] = 0.0;
+    matrix[5] = temp / temp3;
+    matrix[6] = 0.0;
+    matrix[7] = 0.0;
+    matrix[8] = (right + left) / temp2;
+    matrix[9] = (top + bottom) / temp3;
+    matrix[10] = (-zfar - znear) / temp4;
+    matrix[11] = -1.0;
+    matrix[12] = 0.0;
+    matrix[13] = 0.0;
+    matrix[14] = (-temp * zfar) / temp4;
+    matrix[15] = 0.0;
+}

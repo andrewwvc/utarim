@@ -54,7 +54,7 @@ Skeleton makeSkeletonFile(string filename)
 	    sName = lineBuffer;
 	    lineBuffer = handle.readln();
 	    debug writeln("lb: ", lineBuffer);
-	    fLength = parse!double(lineBuffer);
+	    fLength = parse!double(lineBuffer)*3.0;
 	    lineBuffer = handle.readln();
 	    debug writeln("lb: ", lineBuffer);
 	    Parent =  parse!int(lineBuffer);
@@ -116,7 +116,7 @@ Quat[][] makeAnimationFile(Skeleton skl, string filename)
     lineBuffer = handle.readln();
     int noFrames = parse!(int)(lineBuffer);
     
-    animation = new Quat[][](noBones, noFrames);
+    animation = new Quat[][](noFrames, noBones);
     
     int currentFrame = 0;
 
@@ -129,7 +129,7 @@ Quat[][] makeAnimationFile(Skeleton skl, string filename)
 	
 	lineBuffer = handle.readln();
 	auto qArray = parse!(double[4])(lineBuffer);
-	with (animation[boneNo][currentFrame])
+	with (animation[currentFrame][boneNo])
 	{
 	  w = qArray[0];
 	  i = qArray[1];
@@ -370,23 +370,16 @@ void drawSkeletonMesh(Skeleton skel, Quat[][] frames, real fvalue, bool loop = f
         real frame;
         real interp = modf(fvalue, frame);
         uint iframe = cast(uint)(frame);
-        if (loop)
-            drawBone(0, frames[iframe%frames.length], frames[(iframe+1)%frames.length], interp, 1.0);
-        else
-            drawBone(0, frames[cast(uint)(fmin(frame, frames.length-1))], frames[cast(uint)(fmin(frame+1, frames.length-1))], interp, 1.0);
+        foreach(int ii, Bone b; skel.bones)
+        {
+	  if (b.Parent == -1)
+	  {
+	    if (loop)
+		drawBone(ii, frames[iframe%frames.length], frames[(iframe+1)%frames.length], interp, 1.0);
+	    else
+		drawBone(ii, frames[cast(uint)(fmin(frame, frames.length-1))], frames[cast(uint)(fmin(frame+1, frames.length-1))], interp, 1.0);
+	  }
+	}
 
-
-
-//    foreach(int ii, Bone b; skel.bones)
-//    {
-//        glTranslatef(b.vOffset.x, b.vOffset.y, b.vOffset.z);
-//        glTranslatef(0.0, b.fLength*0.5, 0.0);
-//        glScalef(1.0, b.fLength, 1.0);
-//        glDrawElements(GL_QUADS, cubeVerts.length/3, GL_UNSIGNED_BYTE, cast(void*)indices);
-//        glTranslatef(0.0, fLength*0.5, 0.0);
-//        //make
-//
-//    }
-
-    glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_VERTEX_ARRAY);
 } 

@@ -152,6 +152,11 @@ void main()
 	
 	testSkel = makeSkeletonFile("./blend/skelcap.txt");
 	testAnim = makeAnimationFile(testSkel, "./blend/animcap.txt");
+	writeln("TA: ", testAnim[0][6].toString());
+	
+	//int[][2] blah = new int[][](2, 10);
+	//auto ging = blah[];
+	//writeln(ging[1][4]);
 	
 	//Initialize Projection Matrix
 	glMatrixMode( GL_PROJECTION ); //glLoadIdentity();
@@ -203,12 +208,8 @@ void realtime() @nogc
 	  
 	setupGame();
 	
-	FreeList!(Mallocator, 2, 200) lista;
-	lista.allocate(3);
-	lista.allocate(3);
-	
-	
 	TickDuration lastTime = TickDuration.currSystemTick();
+	TickDuration firstTime = lastTime;
 	TickDuration newTime;
 	TickDuration dt;
       
@@ -245,13 +246,6 @@ void realtime() @nogc
 	    }
 	    
 	  }
-	  
-// 	  if( currentKeyStates[ SDL_SCANCODE_DOWN ] )
-// 	    glColor4f(0.0f, 0.8f, 0.8f, 1.0f);
-// 	  else if(currentKeyStates[SDL_SCANCODE_UP])
-// 	  {
-// 	  	glColor4f(1.0f, 0.8f, 0.0f, 1.0f);
-// 	  }
 
 	  //Time update
 	  newTime = TickDuration.currSystemTick();
@@ -273,14 +267,19 @@ void realtime() @nogc
 	  //mProgram.use();
 	  ManBody.useShaderProgram();
 	  glPushMatrix();
-	    glTranslatef(0.0,0.0,-10);
+	    glTranslatef(0.0,0.0,-15.0);
 	    man1.update(dt.length / cast(double)TickDuration.ticksPerSec);
 	    man1.render();
 	    man2.update(0.03);
 	    glTranslatef(5.0f, 1.0f, -2.0f);
 	    man2.render();
 	    glTranslatef(-5.0f, -1.0f, 2.0f);
-	    drawSkeletonMesh(testSkel, testAnim, 3.0);
+	    glPushMatrix();
+	      //glRotatef(90.0f, -1.0f, 0.0f, 0.0f);
+	      double tickVal = (lastTime.length-firstTime.length)*(10.0/cast(double)TickDuration.ticksPerSec);
+	      drawSkeletonMesh(testSkel, testAnim, tickVal, true);
+	      //printf("TV: %f\n", tickVal);
+	    glPopMatrix();
 	    
 	  glPopMatrix();
 	  

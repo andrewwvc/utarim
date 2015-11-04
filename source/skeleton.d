@@ -10,6 +10,45 @@ import std.conv;
 
 const int MAX_BONE_CHILDREN = 8;
 
+@nogc
+void zeroifyQuat(ref Quat q, vreal threshold = 1.0e-5)
+{
+  
+  if(abs(q.w) < threshold)
+    q.w = 0.0;
+  if(abs(q.i) < threshold)
+    q.i = 0.0;
+  if(abs(q.j) < threshold)
+    q.j = 0.0;
+  if(abs(q.k) < threshold)
+    q.k = 0.0;
+}
+
+@nogc
+void purifyQuat(ref Quat q)
+{
+  zeroifyQuat(q);
+  q.normalise();
+}
+
+unittest
+{
+  auto q1 = zeroifyQuat(Quat(0.0, 0.0, 0.0, 0.0));
+  assert(q1.w == 0.0 && q1.i == 0.0 && q1.j == 0.0 && q1.k== 0.0);
+  q1 = zeroifyQuat(Quat(1.0, 1.0, 1.0, 1.0));
+  assert(q1.w == 1.0 && q1.i == 1.0 && q1.j == 1.0 && q1.k== 1.0);
+  q1 = zeroifyQuat(Quat(-1.0, -1.0, -1.0, -1.0));
+  assert(q1.w == -1.0 && q1.i == -1.0 && q1.j == -1.0 && q1.k== -1.0);
+  q1 = zeroifyQuat(Quat(1.0e-5, 1.0e-5, 1.0e-5, 1.0e-5));
+  assert(q1.w == 1.0e-5 && q1.i == 1.0e-5 && q1.j == 1.0e-5 && q1.k== 1.0e-5);
+  q1 = zeroifyQuat(Quat(-1.0e-5, -1.0e-5, -1.0e-5, -1.0e-5));
+  assert(q1.w == -1.0e-5 && q1.i == -1.0e-5 && q1.j == -1.0e-5 && q1.k== -1.0e-5);
+  q1 = zeroifyQuat(Quat(1.0e-7, 1.0e-7, 1.0e-7, 1.0e-7));
+  assert(q1.w == 0.0 && q1.i == 0.0 && q1.j == 0.0 && q1.k== 0.0);
+  q1 = zeroifyQuat(Quat(-1.0e-7, -1.0e-7, -1.0e-7, -1.0e-7));
+  assert(q1.w == 0.0 && q1.i == 0.0 && q1.j == 0.0 && q1.k== 0.0);
+}
+
 struct Bone
 {
     Quat qRotate;
@@ -54,7 +93,7 @@ Skeleton makeSkeletonFile(string filename)
 	    sName = lineBuffer;
 	    lineBuffer = handle.readln();
 	    debug writeln("lb: ", lineBuffer);
-	    fLength = parse!double(lineBuffer)*3.0;
+	    fLength = parse!double(lineBuffer);
 	    lineBuffer = handle.readln();
 	    debug writeln("lb: ", lineBuffer);
 	    Parent =  parse!int(lineBuffer);
@@ -73,6 +112,7 @@ Skeleton makeSkeletonFile(string filename)
 	    qRotate.i = qArray[1];
 	    qRotate.j = qArray[2];
 	    qRotate.k = qArray[3];
+	    purifyQuat(qRotate);
 
 	    lineBuffer = handle.readln(); //Reads the line with the '<' character.
 	    lineBuffer = handle.readln(); //Reads the first Child value.
@@ -129,12 +169,13 @@ Quat[][] makeAnimationFile(Skeleton skl, string filename)
 	
 	lineBuffer = handle.readln();
 	auto qArray = parse!(double[4])(lineBuffer);
-	with (animation[currentFrame][boneNo])
 	{
-	  w = qArray[0];
-	  i = qArray[1];
-	  j = qArray[2];
-	  k = qArray[3];
+	  Quat* q = &animation[currentFrame][boneNo];
+	  q.w = qArray[0];
+	  q.i = qArray[1];
+	  q.j = qArray[2];
+	  q.k = qArray[3];
+	  purifyQuat(*q);
 	}
       }
       
@@ -316,6 +357,7 @@ void drawSkeletonMesh(Skeleton skel, Quat[][] frames, real fvalue, bool loop = f
         {
             //Generates an interpolation between frames
             Quat inter_Quat = f[index]*(f[index].conj()*g[index]).pow(interpolation);
+            purifyQuat(inter_Quat);
 
             with (inter_Quat)
             {
@@ -341,7 +383,7 @@ void drawSkeletonMesh(Skeleton skel, Quat[][] frames, real fvalue, bool loop = f
                 glTranslatef(0.0, fLength*0.5, 0.0);
                 glScalef(1.0, fLength, 1.0);
                 glDrawElements(GL_QUADS, cast(uint) indices.length, GL_UNSIGNED_BYTE, cast(const(void)*) indices.ptr);
-                glScalef(1.0, 1/fLength, 1.0); //This will not work with normal based lighting!
+                glScalef(1.0, 1.0/fLength, 1.0); //This will not work with normal based lighting!
                 glTranslatef(0.0, fLength*0.5, 0.0);
             }
 

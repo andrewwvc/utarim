@@ -49,6 +49,7 @@ for frame in range(scene.frame_end+1):
     candidatePoseVal = storePoseBones(pose_bones)
     if (currentPoseVal != candidatePoseVal):
         frameTotal += 1
+        currentPoseVal = storePoseBones(pose_bones)
 
 f.write(str(frameTotal)+'\n')
 

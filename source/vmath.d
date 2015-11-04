@@ -12,7 +12,7 @@ private
 const float TAU = 2.0*PI;
 
 alias float greal;
-alias double vreal;
+alias real vreal;
 alias greal[16] GlMatrix;
 
 
@@ -116,7 +116,7 @@ struct Quat
     @nogc
     this(vreal W, vreal I, vreal J, vreal K)
     {
-        w= W;
+        w=W;
         i=I;
         j=J;
         k=K;

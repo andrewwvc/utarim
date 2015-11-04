@@ -39,10 +39,10 @@ void setupSkelGL()
     uint width = SCREEN_WIDTH;
     uint bitsPerPixel= 24;
     float fov = 90;
-    float nearPlane = 0.1f;
+    float nearPlane = 1.0f;
     float farPlane = 100.0f;
 
-    //glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     //glDepthFunc(GL_LEQUAL);
     glMatrixMode(GL_PROJECTION);
@@ -118,6 +118,7 @@ void main()
 	//SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE );
 	SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 2 );
 	SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 1 );
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
 	
 	//Create window
 	gWindow = SDL_CreateWindow("Utarim", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN );
@@ -258,7 +259,7 @@ void realtime() @nogc
 	  gameUpdate();
 	  
 	  //Clear color buffer
-	  glClear( GL_COLOR_BUFFER_BIT );
+	  glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	  glMatrixMode(GL_MODELVIEW);
 	  
 	  //mProgram.useFixed();
@@ -274,9 +275,11 @@ void realtime() @nogc
 	    glTranslatef(5.0f, 1.0f, -2.0f);
 	    man2.render();
 	    glTranslatef(-5.0f, -1.0f, 2.0f);
+	    glUseProgram(0);
 	    glPushMatrix();
-	      //glRotatef(90.0f, -1.0f, 0.0f, 0.0f);
+	      glTranslatef(0.0, 0.0, 8.0);
 	      double tickVal = (lastTime.length-firstTime.length)*(10.0/cast(double)TickDuration.ticksPerSec);
+	      glRotatef(tickVal, 1.0f, 1.0f, 0.0f);
 	      drawSkeletonMesh(testSkel, testAnim, tickVal, true);
 	      //printf("TV: %f\n", tickVal);
 	    glPopMatrix();

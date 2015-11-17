@@ -12,7 +12,7 @@ private
 const float TAU = 2.0*PI;
 
 alias float greal;
-alias real vreal;
+alias greal vreal;
 alias greal[16] GlMatrix;
 
 

@@ -100,7 +100,7 @@ void takedownControllers() @nogc
 
 
 Skeleton testSkel;
-Quat[][] testAnim;
+Quat[][] testAnim, otherAnim;
 
 void main()
 {
@@ -152,7 +152,8 @@ void main()
 	setupSkelGL();
 	
 	testSkel = makeSkeletonFile("./blend/skelcap.txt");
-	testAnim = makeAnimationFile(testSkel, "./blend/animcap.txt");
+	testAnim = makeAnimationFile(testSkel, "./blend/LayKick.txt");
+	otherAnim = makeAnimationFile(testSkel, "./blend/animcap.txt");
 	writeln("TA: ", testAnim[0][6].toString());
 	
 	//int[][2] blah = new int[][](2, 10);
@@ -280,7 +281,10 @@ void realtime() @nogc
 	      glTranslatef(0.0, 0.0, 8.0);
 	      double tickVal = (lastTime.length-firstTime.length)*(10.0/cast(double)TickDuration.ticksPerSec);
 	      glRotatef(tickVal, 1.0f, 1.0f, 0.0f);
-	      drawSkeletonMesh(testSkel, testAnim, tickVal, true);
+	      if (P1.ci.buttons[0])
+		drawSkeletonMesh(testSkel, testAnim, tickVal, true);
+	      else
+		drawSkeletonMesh(testSkel, otherAnim, tickVal, true);
 	      //printf("TV: %f\n", tickVal);
 	    glPopMatrix();
 	    

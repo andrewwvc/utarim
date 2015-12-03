@@ -239,8 +239,10 @@ class ManBody
 	  glMatrixMode(GL_MODELVIEW);
 	  glPushMatrix();
 	    glRotatef(time*2.0, 0.0, 1.0, 0.0);
-
-	    static Quat[][] frames = [[Quat(1,0,0,0), Quat(1,0,0,0),
+	    
+	    
+	    //static Quat[][] frames = ;
+	      static Animation anim = Animation([[Quat(1,0,0,0), Quat(1,0,0,0),
 	      rotationQuat(TAU*0.25,0,0,-1), rotationQuat(TAU*0.25,0,0,1),
 	      rotationQuat(TAU*0.25,0,0,-1), rotationQuat(TAU*0.25,0,0,1),
 	      rotationQuat(TAU*0.5,0,0,1),
@@ -256,10 +258,12 @@ class ManBody
 	      rotationQuat(TAU*0.25,0,0,-1), rotationQuat(TAU*0.25,0,0,1)*rotationQuat(TAU*0.25,0,1,0),
 	      rotationQuat(TAU*0.25,0,0,-1), rotationQuat(TAU*0.25,0,0,1),
 	      rotationQuat(TAU/10,-1,0,0)*rotationQuat(TAU*0.6,0,0,1),
-	      Quat(1,0,0,0), Quat(1,0,0,0), Quat(1,0,0,0), Quat(1,0,0,0)]];
-
+	      Quat(1,0,0,0), Quat(1,0,0,0), Quat(1,0,0,0), Quat(1,0,0,0)]],
+	      [1,2,3]);
+	    
+	    
 	    //frames[0][5] = frames[0][5].pow(0.99);
-	    drawSkeletonMesh(dummy, frames, time*0.5, true);
+	    drawSkeletonMesh(dummy, anim, time*0.5, true);
 	  glPopMatrix();
 	}
 }

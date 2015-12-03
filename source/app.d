@@ -100,7 +100,7 @@ void takedownControllers() @nogc
 
 
 Skeleton testSkel;
-Quat[][] testAnim, otherAnim;
+Animation testAnim, otherAnim;
 
 void main()
 {
@@ -153,8 +153,9 @@ void main()
 	
 	testSkel = makeSkeletonFile("./blend/skelcap.txt");
 	testAnim = makeAnimationFile(testSkel, "./blend/LayKick.txt");
-	otherAnim = makeAnimationFile(testSkel, "./blend/animcap.txt");
-	writeln("TA: ", testAnim[0][6].toString());
+	otherAnim = makeAnimationFile(testSkel, "./blend/Squat.txt");
+	//otherAnim = makeAnimationFile(testSkel, "./blend/animcap.txt");
+	writeln("TA: ", testAnim.frames[0][6].toString());
 	
 	//int[][2] blah = new int[][](2, 10);
 	//auto ging = blah[];

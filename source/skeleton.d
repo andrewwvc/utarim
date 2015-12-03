@@ -67,6 +67,12 @@ struct Skeleton
     Bone[] bones;
 }
 
+struct Animation
+{
+  Quat[][] frames;
+  int[] frameNos;
+}
+
 Skeleton makeSkeletonFile(string filename)
 {
     Skeleton skl;
@@ -144,19 +150,20 @@ Skeleton makeSkeletonFile(string filename)
     return skl;
 }
 
-Quat[][] makeAnimationFile(Skeleton skl, string filename)
+Animation makeAnimationFile(Skeleton skl, string filename)
 {
-    Quat[][] animation;
+    Animation animation;
     
     auto handle = File(filename, "r");
     string lineBuffer;
     
-    lineBuffer = handle.readln();
+    lineBuffer = handle.readln(); //Read in number of bones
     int noBones = parse!(int)(lineBuffer);
-    lineBuffer = handle.readln();
+    lineBuffer = handle.readln();//Read in number of frames
     int noFrames = parse!(int)(lineBuffer);
     
-    animation = new Quat[][](noFrames, noBones);
+    animation.frames = new Quat[][](noFrames, noBones);
+    animation.frameNos = new int[](noFrames);
     
     int currentFrame = 0;
 
@@ -170,7 +177,7 @@ Quat[][] makeAnimationFile(Skeleton skl, string filename)
 	lineBuffer = handle.readln();
 	auto qArray = parse!(double[4])(lineBuffer);
 	{
-	  Quat* q = &animation[currentFrame][boneNo];
+	  Quat* q = &(animation.frames)[currentFrame][boneNo];
 	  q.w = qArray[0];
 	  q.i = qArray[1];
 	  q.j = qArray[2];
@@ -347,7 +354,7 @@ void setupCube()
 }
 
 
-void drawSkeletonMesh(Skeleton skel, Quat[][] frames, real fvalue, bool loop = false) @nogc
+void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool loop = false) @nogc
 {
     void drawBone(int index, Quat[] f, Quat[] g, real interpolation, float col) @nogc
     {
@@ -399,6 +406,7 @@ void drawSkeletonMesh(Skeleton skel, Quat[][] frames, real fvalue, bool loop = f
             }
         }
     }
+    
 
     glMatrixMode(GL_MODELVIEW);
 
@@ -408,18 +416,24 @@ void drawSkeletonMesh(Skeleton skel, Quat[][] frames, real fvalue, bool loop = f
         //glIndexPointer();
 
         glColor3f (0.0, 1.0, 0);
-
-        real frame;
-        real interp = modf(fvalue, frame);
-        uint iframe = cast(uint)(frame);
-        foreach(int ii, Bone b; skel.bones)
+        
+        with (anim)
         {
-	  if (b.Parent == -1)
+
+	  real frame;
+	  real interp = modf(fvalue, frame);
+	  foreach(int ii, Bone b; skel.bones)
 	  {
-	    if (loop)
-		drawBone(ii, frames[iframe%frames.length], frames[(iframe+1)%frames.length], interp, 1.0);
-	    else
-		drawBone(ii, frames[cast(uint)(fmin(frame, frames.length-1))], frames[cast(uint)(fmin(frame+1, frames.length-1))], interp, 1.0);
+	    if (b.Parent == -1)
+	    {
+	      if (loop)
+	      {
+		  uint iframe = cast(uint)(frame);
+		  drawBone(ii, frames[iframe%frames.length], frames[(iframe+1)%frames.length], interp, 1.0);
+	      }
+	      else
+		  drawBone(ii, frames[cast(uint)(fmin(frame, frames.length-1))], frames[cast(uint)(fmin(frame+1, frames.length-1))], interp, 1.0);
+	    }
 	  }
 	}
 

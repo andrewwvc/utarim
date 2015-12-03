@@ -37,12 +37,13 @@ def storePoseBones(pbs):
     return [pb.matrix.copy() for pb in pbs]
         
 
-        
-frame_position_set = set()
+
 for action in acts:
     f = open(os.path.join(basedir, action.name) + ".txt", 'w', encoding='utf-8')
     f.write(str(len(armature.pose.bones))+'\n')
     
+    frame_position_set = set()
+    armature.animation_data.action = action
     for fcu in action.fcurves:
         for kf in fcu.keyframe_points:
             frame_position_set.add(int(kf.co[0]))

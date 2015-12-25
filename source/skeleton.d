@@ -169,6 +169,9 @@ Animation makeAnimationFile(Skeleton skl, string filename)
 
     while(null != (lineBuffer = handle.readln()))
     {
+      //Read frame number
+      animation.frameNos[currentFrame] = parse!(int)(lineBuffer);
+      
       for (int boneNo = 0; boneNo < noBones; ++boneNo)
       {
 	//Skips the number lineBuffer
@@ -356,14 +359,15 @@ void setupCube()
 
 void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool loop = false) @nogc
 {
-    void drawBone(int index, Quat[] f, Quat[] g, real interpolation, float col) @nogc
+    void drawBone(int index, Quat[] f, Quat[] g, vreal interpolation, float col) @nogc
     {
         glColor3f(0.0, col, 1.0-col);
 
         with (skel.bones[index])
         {
             //Generates an interpolation between frames
-            Quat inter_Quat = f[index]*(f[index].conj()*g[index]).pow(interpolation);
+            //Quat inter_Quat = f[index]*(f[index].conj()*g[index]).pow(interpolation);
+            Quat inter_Quat = slerp(f[index], g[index], interpolation);
             purifyQuat(inter_Quat);
 
             with (inter_Quat)
@@ -417,22 +421,52 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 
         glColor3f (0.0, 1.0, 0);
         
+        
         with (anim)
         {
-
-	  real frame;
-	  real interp = modf(fvalue, frame);
-	  foreach(int ii, Bone b; skel.bones)
+        
+	  int maxFrame = frameNos[$-1];
+	  int minFrame = frameNos[0];
+	  //printf("len: %i\n", maxFrame);
+	  
+	  if (false)
 	  {
-	    if (b.Parent == -1)
+	    real frame;
+	    real interp = modf(fvalue, frame);
+	    foreach(int ii, Bone b; skel.bones)
 	    {
-	      if (loop)
+	      if (b.Parent == -1)
 	      {
-		  uint iframe = cast(uint)(frame);
-		  drawBone(ii, frames[iframe%frames.length], frames[(iframe+1)%frames.length], interp, 1.0);
+		if (loop)
+		{
+		    uint iframe = cast(uint)(frame);
+		    drawBone(ii, frames[iframe%$], frames[(iframe+1)%$], interp, 1.0);
+		}
+		else
+		    drawBone(ii, frames[cast(uint)(fmin(frame, $-1))], frames[cast(uint)(fmin(frame+1, $-1))], interp, 1.0);
 	      }
-	      else
-		  drawBone(ii, frames[cast(uint)(fmin(frame, frames.length-1))], frames[cast(uint)(fmin(frame+1, frames.length-1))], interp, 1.0);
+	    }
+	  }
+	  else
+	  {
+	    //Find frames
+	    int fseed = 0;
+	    
+	    vreal internalVal = (fvalue % (maxFrame-minFrame)) + minFrame;
+	    if (internalVal >= maxFrame)
+	      internalVal = minFrame;
+	    
+	    //printf("intVal: %f\n", internalVal);
+	    while (!(frameNos[fseed] <= internalVal && internalVal < frameNos[fseed+1]))
+	      {++fseed;}
+	      
+	    internalVal = (internalVal - frameNos[fseed]) / (frameNos[fseed+1]-frameNos[fseed]);
+	    foreach(int ii, Bone b; skel.bones)
+	    {
+	      if (b.Parent == -1)
+	      {
+		drawBone(ii, frames[fseed], frames[fseed+1], internalVal, 1.0);
+	      }
 	    }
 	  }
 	}

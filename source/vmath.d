@@ -248,6 +248,46 @@ Quat rotationQuat(vreal theta, Vec3 vec)
     return rotationQuat(theta, vec.x, vec.y, vec.z);
 }
 
+@nogc
+vreal dotProduct(ref Quat q1, ref Quat q2)
+{
+  return (q1.w * q2.w) + (q1.i * q2.i) + (q1.j * q2.j) + (q1.k * q2.k);
+}
+
+@nogc
+Quat lerp(ref Quat q1, ref Quat q2, vreal interp)
+{
+  return q1*(1.0- interp) + q2*interp;
+}
+
+@nogc
+Quat slerp(ref Quat q1, ref Quat q2, vreal interp, vreal threshold = 0.95f /*Value should be between 0.0 and 1.0*/)
+{
+  vreal cosine = dotProduct(q1, q2);
+  
+  if (cosine < 0.0f)
+  {
+    q1.w *= -1.0f;
+    q1.i *= -1.0f;
+    q1.j *= -1.0f;
+    q1.k *= -1.0f;
+    cosine *= -1.0f;
+  }
+  
+  if (cosine <= threshold) // spherical interpolation
+  {
+    const vreal theta = acos(cosine);
+    const vreal invsintheta = 1.0/(sin(theta));
+    const vreal scale = sin(theta * (1.0f-interp)) * invsintheta;
+    const vreal invscale = sin(theta * interp) * invsintheta;
+    return ((q1*scale) + (q2*invscale));
+  }
+  else // linear interpolation
+  {
+    return lerp(q1,q2,interp);
+  }
+}
+
 unittest
 {
     Quat q1 = Quat(0.0, 0.0, 1.0, 0.0);

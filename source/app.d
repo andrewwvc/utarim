@@ -179,6 +179,14 @@ void main()
 	//Initialize clear color
 	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
 	
+	Quat qt1 = rotationQuat(TAU*0.25, 0, 0, 1);
+	Quat inter_Quat1 = qt1*(qt1.conj()*qt1).pow(0.0);
+	writeln("Q1: ", inter_Quat1.toString());
+	inter_Quat1 = qt1*(qt1.conj()*qt1).pow(0.5);
+	writeln("Q2: ", inter_Quat1.toString());
+	inter_Quat1 = qt1*(qt1.conj()*qt1).pow(1.0);
+	writeln("Q3: ", inter_Quat1.toString());
+	
       
         //Collects all garbage and suspends the GC
         GC.collect();

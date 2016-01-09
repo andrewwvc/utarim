@@ -259,6 +259,7 @@ class ManBody
 	      rotationQuat(TAU*0.25,0,0,-1), rotationQuat(TAU*0.25,0,0,1),
 	      rotationQuat(TAU/10,-1,0,0)*rotationQuat(TAU*0.6,0,0,1),
 	      Quat(1,0,0,0), Quat(1,0,0,0), Quat(1,0,0,0), Quat(1,0,0,0)]],
+	      [Vec3(0,0,0), Vec3(0,0,0), Vec3(0,0,0)],
 	      [0,1,2]);
 	    
 	    

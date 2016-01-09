@@ -70,6 +70,7 @@ struct Skeleton
 struct Animation
 {
   Quat[][] frames;
+  Vec3[] framePos;
   int[] frameNos;
 }
 
@@ -164,6 +165,7 @@ Animation makeAnimationFile(Skeleton skl, string filename)
     
     animation.frames = new Quat[][](noFrames, noBones);
     animation.frameNos = new int[](noFrames);
+    animation.framePos = new Vec3[](noFrames);
     
     int currentFrame = 0;
 
@@ -171,6 +173,11 @@ Animation makeAnimationFile(Skeleton skl, string filename)
     {
       //Read frame number
       animation.frameNos[currentFrame] = parse!(int)(lineBuffer);
+      
+      //Read relative position vector
+      lineBuffer = handle.readln();
+      auto tempPos = parse!(double[3])(lineBuffer);
+      animation.framePos[currentFrame] = Vec3(tempPos[0], tempPos[1], tempPos[2]);
       
       for (int boneNo = 0; boneNo < noBones; ++boneNo)
       {
@@ -461,13 +468,21 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 	      {++fseed;}
 	      
 	    internalVal = (internalVal - frameNos[fseed]) / (frameNos[fseed+1]-frameNos[fseed]);
-	    foreach(int ii, Bone b; skel.bones)
-	    {
-	      if (b.Parent == -1)
+	    
+	    Vec3 posA = anim.framePos[fseed].mult(1.0-internalVal);
+	    Vec3 posB = anim.framePos[fseed+1].mult(internalVal);
+	    Vec3 pos = posA+posB;
+	    
+	    glTranslatef(pos.x, pos.y, pos.z);
+	      
+	      foreach(int ii, Bone b; skel.bones)
 	      {
-		drawBone(ii, frames[fseed], frames[fseed+1], internalVal, 1.0);
+		if (b.Parent == -1)
+		{
+		  drawBone(ii, frames[fseed], frames[fseed+1], internalVal, 1.0);
+		}
 	      }
-	    }
+	    glTranslatef(-pos.x, -pos.y, -pos.z);
 	  }
 	}
 

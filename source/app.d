@@ -289,7 +289,7 @@ void realtime() @nogc
 	    glPushMatrix();
 	      glTranslatef(0.0, 0.0, 8.0);
 	      double tickVal = (lastTime.length-firstTime.length)*(10.0/cast(double)TickDuration.ticksPerSec);
-	      glRotatef(tickVal, 1.0f, 1.0f, 0.0f);
+	      glRotatef(tickVal, 0.0f, 1.0f, 0.0f);
 	      if (P1.ci.buttons[0])
 		drawSkeletonMesh(testSkel, testAnim, tickVal, true);
 	      else

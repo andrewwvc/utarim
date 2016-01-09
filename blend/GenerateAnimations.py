@@ -55,6 +55,10 @@ for action in acts:
     for frame in frame_list:
         scene.frame_set(frame)
         f.write(str(frame)+'[\n')
+        #NOTE: Assumes the very first bone is the top of the hierarchy, and uses this to ascertain the reletive position from the origin
+        topVec = pose_bones[0].location
+        
+        f.write('[' + str(topVec.x) + ', ' + str(topVec.y) + ', ' + str(topVec.z) + ']\n')
         for pose_bone in pose_bones:
             f.write(str(list(pose_bones).index(pose_bone))+'\n')
             relQuat = relativeMatrix(pose_bone).to_quaternion()

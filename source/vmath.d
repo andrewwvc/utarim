@@ -233,6 +233,26 @@ struct Quat
         creal theta = expi(acos(w)*val);
         return Quat(theta.re, theta.im*a, theta.im*b, theta.im*c);
     }
+    
+    @nogc
+    GlMatrix quatToMat(Vec3 offset)
+    {
+      auto ii2 = 2*i*i;
+      auto jj2 = 2*j*j;
+      auto kk2 = 2*k*k;
+      auto ij2 = 2*i*j;
+      auto wk2 = 2*w*k;
+      auto ki2 = 2*k*i;
+      auto wj2 = 2*w*j;
+      auto jk2 = 2*j*k;
+      auto wi2 = 2*w*i;
+      
+      return 
+      [1-jj2-kk2, ij2+wk2,  ki2-wj2,  0,//b.vOffset.i,
+      ij2-wk2,  1-ii2-kk2,  jk2+wi2,  0,//b.vOffset.j,
+      ki2+wj2,  jk2-wi2,  1-ii2-jj2,  0,//b.vOffset.z,
+      offset.x,  offset.y,  offset.z,  1];
+    }
 }
 
 //NOTE: x^2+y^2+z^2 must equal 1
@@ -287,6 +307,7 @@ Quat slerp(ref Quat q1, ref Quat q2, vreal interp, vreal threshold = 0.95f /*Val
     return lerp(q1,q2,interp);
   }
 }
+
 
 unittest
 {

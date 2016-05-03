@@ -106,8 +106,9 @@ void main()
 {
 	//Main will use the GC in the loading functions
 	//This should load the lastest version, this isn't necessary if we fall back on a function
-	DerelictSDL2.load("/usr/local/lib/libSDL2.so");
-        DerelictGL.load();
+	version(Linux) DerelictSDL2.load("/usr/local/lib/libSDL2.so");
+	version(Windows) DerelictSDL2.load();
+    DerelictGL.load();
 	
 	if (SDL_Init( SDL_INIT_VIDEO | SDL_INIT_JOYSTICK ) < 0)
 	  {printf("SDL could not initialize! SDL Error: %s\n", SDL_GetError()); return;}

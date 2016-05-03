@@ -5,7 +5,6 @@
 	"authors": ["Andrew Van Caem"],
 	"dependencies": {
 	  "derelict-sdl2": "~>1.9.6",
-	  "derelict-gl3": "~>1.0.14",
-	  "m3": "~>0.0.7"
+	  "derelict-gl3": "~>1.0.14"
 	}
 }

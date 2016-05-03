@@ -369,53 +369,55 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
     void drawBone(int index, Quat[] f, Quat[] g, vreal interpolation, float col) @nogc
     {
         glColor3f(0.0, col, 1.0-col);
+        
+        glPushMatrix();
 
-        with (skel.bones[index])
-        {
-            //Generates an interpolation between frames
-            //Quat inter_Quat = f[index]*(f[index].conj()*g[index]).pow(interpolation);
-            Quat inter_Quat = slerp(f[index], g[index], interpolation);
-            purifyQuat(inter_Quat);
+	  with (skel.bones[index])
+	  {
+	      //Generates an interpolation between frames
+	      //Quat inter_Quat = f[index]*(f[index].conj()*g[index]).pow(interpolation);
+	      Quat inter_Quat = slerp(f[index], g[index], interpolation);
+	      purifyQuat(inter_Quat);
 
-            with (inter_Quat)
-            {
-                auto ii2 = 2*i*i;
-                auto jj2 = 2*j*j;
-                auto kk2 = 2*k*k;
-                auto ij2 = 2*i*j;
-                auto wk2 = 2*w*k;
-                auto ki2 = 2*k*i;
-                auto wj2 = 2*w*j;
-                auto jk2 = 2*j*k;
-                auto wi2 = 2*w*i;
-                GlMatrix mat =
-                [1-jj2-kk2, ij2+wk2,  ki2-wj2,  0,//b.vOffset.i,
-                ij2-wk2,  1-ii2-kk2,  jk2+wi2,  0,//b.vOffset.j,
-                ki2+wj2,  jk2-wi2,  1-ii2-jj2,  0,//b.vOffset.z,
-                vOffset.x,  vOffset.y,  vOffset.z,  1];
+	      with (inter_Quat)
+	      {
+		  auto ii2 = 2*i*i;
+		  auto jj2 = 2*j*j;
+		  auto kk2 = 2*k*k;
+		  auto ij2 = 2*i*j;
+		  auto wk2 = 2*w*k;
+		  auto ki2 = 2*k*i;
+		  auto wj2 = 2*w*j;
+		  auto jk2 = 2*j*k;
+		  auto wi2 = 2*w*i;
+		  GlMatrix mat =
+		  [1-jj2-kk2, ij2+wk2,  ki2-wj2,  0,//b.vOffset.i,
+		  ij2-wk2,  1-ii2-kk2,  jk2+wi2,  0,//b.vOffset.j,
+		  ki2+wj2,  jk2-wi2,  1-ii2-jj2,  0,//b.vOffset.z,
+		  vOffset.x,  vOffset.y,  vOffset.z,  1];
 
-                glMultMatrixf(mat.ptr);
+		  glMultMatrixf(mat.ptr);
 
-                //glTranslatef(b.vOffset.x, b.vOffset.y, b.vOffset.z);
-                //glRotatef(b.qRotate.w, b.qRotate.i, b.qRotate.j, b.qRotate.k);
-                glTranslatef(0.0, fLength*0.5, 0.0);
-                glScalef(1.0, fLength, 1.0);
-                glDrawElements(GL_QUADS, cast(uint) indices.length, GL_UNSIGNED_BYTE, cast(const(void)*) indices.ptr);
-                glScalef(1.0, 1.0/fLength, 1.0); //This will not work with normal based lighting!
-                glTranslatef(0.0, fLength*0.5, 0.0);
-            }
+		  //glTranslatef(b.vOffset.x, b.vOffset.y, b.vOffset.z);
+		  //glRotatef(b.qRotate.w, b.qRotate.i, b.qRotate.j, b.qRotate.k);
+		  glTranslatef(0.0, fLength*0.5, 0.0);
+		  glScalef(1.0, fLength, 1.0);
+		  glDrawElements(GL_QUADS, cast(uint) indices.length, GL_UNSIGNED_BYTE, cast(const(void)*) indices.ptr);
+		  glScalef(1.0, 1.0/fLength, 1.0); //This will not work with normal based lighting!
+		  glTranslatef(0.0, fLength*0.5, 0.0);
+	      }
 
 
-            foreach(int ii; Child)
-            {
-                if (ii != 0)
-                {
-                    glPushMatrix();
-                        drawBone(ii, f, g, interpolation, col*0.8);
-                    glPopMatrix();
-                }
-            }
-        }
+	      foreach(int ii; Child)
+	      {
+		  if (ii != 0)
+		  {
+		    drawBone(ii, f, g, interpolation, col*0.8);
+		  }
+	      }
+	  }
+	  
+        glPopMatrix();
     }
     
 

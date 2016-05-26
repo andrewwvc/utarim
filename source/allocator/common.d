@@ -573,7 +573,7 @@ Forwards each of the methods in `funs` (if defined) to `member`.
     return result;
 }
 
-package void testAllocator(alias make)() @nogc
+package void testAllocator(alias make)()
 {
     import std.conv : text;
     import std.stdio : writeln, stderr;

@@ -13,18 +13,21 @@ const float TAU = 2.0*PI;
 
 alias float greal;
 alias greal vreal;
-alias greal[16] GlMatrix;
+alias greal[16] GLMatrix;
 
 
 struct Vec3
 {
+	//vreal[3] values = 0;
+
     vreal x=0;
     vreal y=0;
     vreal z=0;
+	//alias values this;
 
     string toString()
     {
-        return format("V[",x,", ",y,", ",z,"]");
+        return format("V[%f, %f, %f]", x, y, z);
     }
     
     @nogc
@@ -235,7 +238,7 @@ struct Quat
     }
     
     @nogc
-    GlMatrix quatToMat(Vec3 offset)
+    GLMatrix quatToMat(Vec3 offset)
     {
       auto ii2 = 2*i*i;
       auto jj2 = 2*j*j;
@@ -327,13 +330,74 @@ unittest
 	Quat rot = Quat(cos(theta/2), sin(theta/2), 0, 0);
 	Quat result = rot*point*rot.conj;
 	writeln(result);
-} 
+}
+
+Vec3 transformVec3(in ref GLMatrix mat, in ref Vec3 invec)
+{	
+	return Vec3(mat[0]*invec.x + mat[4]*invec.y + mat[8]*invec.z,
+		mat[1]*invec.x + mat[5]*invec.y + mat[9]*invec.z,
+		mat[2]*invec.x + mat[6]*invec.y + mat[10]*invec.z);
+}
+
+struct Pill3
+{
+	vreal radius;
+	Vec3 start;
+	Vec3 end;
+}
+struct Sphere3
+{
+	vreal radius;
+	Vec3 point;
+}
+
+//Returns true of a collision between a pill and a sphere in 3D space
+bool hullPointTest(ref Pill3 pill, ref Sphere3 sphere) @nogc
+{
+	vreal dist = pill.radius + sphere.radius;
+	//printf("dist: %f\n", dist);
+	
+	Vec3 modPillEnd = pill.end - pill.start;
+	//printf("modPillEnd: %s\n", modPillEnd.toString());
+	Vec3 modPoint = sphere.point - pill.start;
+	//printf("modPoint: %s\n", modPoint.toString());
+	vreal modPillLength = modPillEnd.length();
+	//printf("modPillLength: %f\n", modPillLength);
+	vreal cosPoint = modPillEnd.dot(modPoint)/modPillLength;
+	//printf("cosPoint: %f\n", cosPoint);
+	if (cosPoint >= modPillLength)
+	{
+		//printf("(modPillEnd - modPoint): %s\n", (modPillEnd - modPoint).toString());
+		return (modPillEnd - modPoint).length <= dist; //end cap
+	}
+	else if (cosPoint <= 0.0)
+	{
+		//printf("modPoint.length: %f\n", modPoint.length);
+		return modPoint.length <= dist; //start cap
+	}
+	else //midsection
+	{
+		Vec3 modPillMid = modPillEnd*(cosPoint/modPillLength);//modPillEnd/cos, provides the projection of
+		//printf("modPillMid: %s\n", modPillMid.toString());
+		Vec3 distVec = modPoint - modPillMid;
+		return distVec.length < dist;
+	}
+}
+
+void matrixMultiply(ref GLMatrix lMat, ref GLMatrix rMat, ref GLMatrix outMat) @nogc
+{
+	for(int ii=0; ii<16; ii+=4)
+	{
+		for (int jj=0; jj<4; ++jj)
+			outMat[ii+jj] = lMat[jj+0]*rMat[ii+0] + lMat[jj+4]*rMat[ii+1] + lMat[jj+8]*rMat[ii+2] + lMat[jj+12]*rMat[ii+3];
+	}
+}
 
 
 //matrix will receive the calculated perspective matrix.
 //You would have to upload to your shader
 // or use glLoadMatrixf if you aren't using shaders.
-void glhPerspectivef2(ref GlMatrix matrix, greal fovyInDegrees, greal aspectRatio,
+void glhPerspectivef2(ref GLMatrix matrix, greal fovyInDegrees, greal aspectRatio,
                       greal znear, greal zfar) @nogc
 {
     greal ymax, xmax;
@@ -345,7 +409,7 @@ void glhPerspectivef2(ref GlMatrix matrix, greal fovyInDegrees, greal aspectRati
     glhFrustumf2(matrix, -xmax, xmax, -ymax, ymax, znear, zfar);
 }
 
-void glhFrustumf2(ref GlMatrix matrix, greal left, greal right, greal bottom, greal top,
+void glhFrustumf2(ref GLMatrix matrix, greal left, greal right, greal bottom, greal top,
                   greal znear, greal zfar) @nogc
 {
     greal temp, temp2, temp3, temp4;

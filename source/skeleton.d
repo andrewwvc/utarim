@@ -33,19 +33,20 @@ void purifyQuat(ref Quat q)
 
 unittest
 {
-  auto q1 = zeroifyQuat(Quat(0.0, 0.0, 0.0, 0.0));
+  Quat q1 = Quat(0.0, 0.0, 0.0, 0.0);
+  zeroifyQuat(q1);
   assert(q1.w == 0.0 && q1.i == 0.0 && q1.j == 0.0 && q1.k== 0.0);
-  q1 = zeroifyQuat(Quat(1.0, 1.0, 1.0, 1.0));
+  q1 = Quat(1.0, 1.0, 1.0, 1.0); zeroifyQuat(q1);
   assert(q1.w == 1.0 && q1.i == 1.0 && q1.j == 1.0 && q1.k== 1.0);
-  q1 = zeroifyQuat(Quat(-1.0, -1.0, -1.0, -1.0));
+  q1 = Quat(-1.0, -1.0, -1.0, -1.0); zeroifyQuat(q1);
   assert(q1.w == -1.0 && q1.i == -1.0 && q1.j == -1.0 && q1.k== -1.0);
-  q1 = zeroifyQuat(Quat(1.0e-5, 1.0e-5, 1.0e-5, 1.0e-5));
+  q1 = Quat(1.0e-5, 1.0e-5, 1.0e-5, 1.0e-5); zeroifyQuat(q1);
   assert(q1.w == 1.0e-5 && q1.i == 1.0e-5 && q1.j == 1.0e-5 && q1.k== 1.0e-5);
-  q1 = zeroifyQuat(Quat(-1.0e-5, -1.0e-5, -1.0e-5, -1.0e-5));
+  q1 = Quat(-1.0e-5, -1.0e-5, -1.0e-5, -1.0e-5); zeroifyQuat(q1);
   assert(q1.w == -1.0e-5 && q1.i == -1.0e-5 && q1.j == -1.0e-5 && q1.k== -1.0e-5);
-  q1 = zeroifyQuat(Quat(1.0e-7, 1.0e-7, 1.0e-7, 1.0e-7));
+  q1 = Quat(1.0e-7, 1.0e-7, 1.0e-7, 1.0e-7); zeroifyQuat(q1);
   assert(q1.w == 0.0 && q1.i == 0.0 && q1.j == 0.0 && q1.k== 0.0);
-  q1 = zeroifyQuat(Quat(-1.0e-7, -1.0e-7, -1.0e-7, -1.0e-7));
+  q1 = Quat(-1.0e-7, -1.0e-7, -1.0e-7, -1.0e-7); zeroifyQuat(q1);
   assert(q1.w == 0.0 && q1.i == 0.0 && q1.j == 0.0 && q1.k== 0.0);
 }
 
@@ -390,7 +391,7 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 		  auto wj2 = 2*w*j;
 		  auto jk2 = 2*j*k;
 		  auto wi2 = 2*w*i;
-		  GlMatrix mat =
+		  GLMatrix mat =
 		  [1-jj2-kk2, ij2+wk2,  ki2-wj2,  0,//b.vOffset.i,
 		  ij2-wk2,  1-ii2-kk2,  jk2+wi2,  0,//b.vOffset.j,
 		  ki2+wj2,  jk2-wi2,  1-ii2-jj2,  0,//b.vOffset.z,
@@ -438,7 +439,7 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 	  int minFrame = frameNos[0];
 	  //printf("len: %i\n", maxFrame);
 	  
-	  if (false)
+	  if (true)
 	  {
 	    real frame;
 	    real interp = modf(fvalue, frame);
@@ -489,4 +490,87 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 	}
 
 	glDisableClientState(GL_VERTEX_ARRAY);
+} 
+
+
+bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GLMatrix posMat, ref Sphere3 ball) @nogc
+{
+    bool drawBone(int index, Quat[] f, Quat[] g, vreal interpolation, ref GLMatrix newMat) @nogc
+    {
+        //glPushMatrix();
+
+	  with (skel.bones[index])
+	  {
+	      //Generates an interpolation between frames
+	      //Quat inter_Quat = f[index]*(f[index].conj()*g[index]).pow(interpolation);
+	      Quat inter_Quat = slerp(f[index], g[index], interpolation);
+	      purifyQuat(inter_Quat);
+
+	      with (inter_Quat)
+	      {
+			  auto ii2 = 2*i*i;
+			  auto jj2 = 2*j*j;
+			  auto kk2 = 2*k*k;
+			  auto ij2 = 2*i*j;
+			  auto wk2 = 2*w*k;
+			  auto ki2 = 2*k*i;
+			  auto wj2 = 2*w*j;
+			  auto jk2 = 2*j*k;
+			  auto wi2 = 2*w*i;
+			  GLMatrix mat =
+			  [1-jj2-kk2, ij2+wk2,  ki2-wj2,  0,//b.vOffset.i,
+			  ij2-wk2,  1-ii2-kk2,  jk2+wi2,  0,//b.vOffset.j,
+			  ki2+wj2,  jk2-wi2,  1-ii2-jj2,  0,//b.vOffset.z,
+			  vOffset.x,  vOffset.y,  vOffset.z,  1];
+			  
+			  
+
+			  //glMultMatrixf(mat.ptr);
+
+			  // glTranslatef(0.0, fLength*0.5, 0.0);
+			  // glScalef(1.0, fLength, 1.0);
+			  // glDrawElements(GL_QUADS, cast(uint) indices.length, GL_UNSIGNED_BYTE, cast(const(void)*) indices.ptr);
+			  // glScalef(1.0, 1.0/fLength, 1.0); //This will not work with normal based lighting!
+			  // glTranslatef(0.0, fLength*0.5, 0.0);
+			  
+			  auto p3 = Pill3(1,Vec3(0,0,0),Vec3(1,0,0));
+			  if (hullPointTest(p3, ball))
+				return true;
+	      }
+
+
+	      foreach(int ii; Child)
+	      {
+			  if (ii != 0)
+			  {
+				 return drawBone(ii, f, g, interpolation, newMat);
+			  }
+	      }
+		  
+		  return false;
+	  }
+	  
+        //glPopMatrix();
+    }
+
+        
+    with (anim)
+    {
+        
+	  int maxFrame = frameNos[$-1];
+	  int minFrame = frameNos[0];
+
+	    real frame;
+	    real interp = modf(fvalue, frame);
+	    foreach(int ii, Bone b; skel.bones)
+	    {
+	      if (b.Parent == -1)
+	      {
+		    if (drawBone(ii, frames[cast(uint)(fmin(frame, $-1))], frames[cast(uint)(fmin(frame+1, $-1))], interp, posMat))
+				return true;
+	      }
+	    }
+	  
+	}
+	return false;
 } 

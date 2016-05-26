@@ -7,6 +7,7 @@ import vmath;
 import skeleton;
 import manbody;
 import core.time;
+import collisiondet;
 
 import allocator.building_blocks.free_list;
 import allocator.mallocator;
@@ -48,7 +49,7 @@ void setupSkelGL()
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     //gluPerspective(fov, cast(float)height / width, nearPlane, farPlane);
-    GlMatrix matrix;
+    GLMatrix matrix;
     glhPerspectivef2(matrix, fov, cast(float)height / cast(float)width, nearPlane, farPlane);
     debug printf("%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n", matrix[0], matrix[1], matrix[2], matrix[3],  matrix[4], matrix[5], matrix[6], matrix[7],
     matrix[8], matrix[9], matrix[10], matrix[11],  matrix[12], matrix[13], matrix[14], matrix[15],);
@@ -152,6 +153,8 @@ void main()
 	
 	setupSkelGL();
 	
+	//TESTS!
+	
 	testSkel = makeSkeletonFile("./blend/skelcap.txt");
 	testAnim = makeAnimationFile(testSkel, "./blend/LayKick.txt");
 	otherAnim = makeAnimationFile(testSkel, "./blend/Squat.txt");
@@ -161,6 +164,34 @@ void main()
 	//int[][2] blah = new int[][](2, 10);
 	//auto ging = blah[];
 	//writeln(ging[1][4]);
+	
+	Pill3 p = Pill3(1, Vec3(0,0,0), Vec3(10, 0, 0));
+	Sphere3 s = Sphere3(1, Vec3(5, 0, 0));
+	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+	
+	p = Pill3(1, Vec3(100,0,0), Vec3(110, 0, 0));
+	s = Sphere3(1, Vec3(105, 0, 0));
+	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+	
+	p = Pill3(1, Vec3(100,0,0), Vec3(110, 0, 0));
+	s = Sphere3(1, Vec3(115, 0, 0));
+	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+	
+	p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
+	s = Sphere3(1, Vec3(0, 0, 0));
+	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+	
+	p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
+	s = Sphere3(1, Vec3(0, 1, 0));
+	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+	
+	p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
+	s = Sphere3(1, Vec3(-1, 1, -1));
+	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+	
+	p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
+	s = Sphere3(1, Vec3(-2, 0, 0.1));
+	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
 	
 	//Initialize Projection Matrix
 	glMatrixMode( GL_PROJECTION ); //glLoadIdentity();

@@ -23,7 +23,7 @@ SDL_Window* gWindow;
 SDL_GLContext gContext;
 
 //Render flag
-bool gRenderQuad = true;
+bool gRenderQuad = false;
 
 //Graphics program
 GLuint gProgramID = 0;
@@ -100,8 +100,18 @@ void takedownControllers() @nogc
 }
 
 
-Skeleton testSkel;
-Animation testAnim, otherAnim;
+//Skeleton testSkel;
+//Animation testAnim, otherAnim;
+
+Skeleton fighterSkeleton;
+Animation fighterAnimKick, fighterAnimSquat;
+
+	void loadFighterSkeleton()
+	{
+		fighterSkeleton = makeSkeletonFile("./blend/skelcap.txt");
+		fighterAnimKick = makeAnimationFile(fighterSkeleton, "./blend/LayKick.txt");
+		fighterAnimSquat = makeAnimationFile(fighterSkeleton, "./blend/Squat.txt");
+	}
 
 void main()
 {
@@ -155,15 +165,27 @@ void main()
 	
 	//TESTS!
 	
-	testSkel = makeSkeletonFile("./blend/skelcap.txt");
-	testAnim = makeAnimationFile(testSkel, "./blend/LayKick.txt");
-	otherAnim = makeAnimationFile(testSkel, "./blend/Squat.txt");
+	loadFighterSkeleton();
+	
+	//testSkel = makeSkeletonFile("./blend/skelcap.txt");
+	//testAnim = makeAnimationFile(testSkel, "./blend/LayKick.txt");
+	//otherAnim = makeAnimationFile(testSkel, "./blend/Squat.txt");
 	//otherAnim = makeAnimationFile(testSkel, "./blend/animcap.txt");
-	writeln("TA: ", testAnim.frames[0][6].toString());
+	writeln("TA: ", fighterAnimKick.frames[0][6].toString());
 	
 	//int[][2] blah = new int[][](2, 10);
 	//auto ging = blah[];
 	//writeln(ging[1][4]);
+	
+	GLMatrix identityMat = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+	Sphere3[] testBall = [Sphere3(1.0, Vec3(1.5,1.0,0))];
+	writeln("SkeletonBallTest: " ~ (testSkeletonBall(fighterSkeleton, fighterAnimKick, 1.0, identityMat, testBall)? "T":"F") ~'\n');
+	
+	testBall[] = Sphere3(1.0, Vec3(0,8.5,0));
+	writeln("SkeletonBallTest: " ~ (testSkeletonBall(fighterSkeleton, fighterAnimKick, 1.0, identityMat, testBall)? "T":"F") ~ Vec3(0,8.5,0).stringof ~'\n');
+	
+	testBall[] = Sphere3(1.0, Vec3(0.5,0.5,0));
+	writeln("SkeletonBallTest: " ~ (testSkeletonBall(fighterSkeleton, fighterAnimKick, 28.0, identityMat, testBall)? "T":"F") ~'\n');
 	
 	Pill3 p = Pill3(1, Vec3(0,0,0), Vec3(10, 0, 0));
 	Sphere3 s = Sphere3(1, Vec3(5, 0, 0));
@@ -308,28 +330,28 @@ void realtime() @nogc
 	  glUseProgram(0);
 	  renderFighters();
 	  //mProgram.use();
-	  ManBody.useShaderProgram();
-	  glPushMatrix();
-	    glTranslatef(0.0,0.0,-15.0);
-	    man1.update(dt.length / cast(double)TickDuration.ticksPerSec);
-	    man1.render();
-	    man2.update(0.03);
-	    glTranslatef(5.0f, 1.0f, -2.0f);
-	    man2.render();
-	    glTranslatef(-5.0f, -1.0f, 2.0f);
-	    glUseProgram(0);
-	    glPushMatrix();
-	      glTranslatef(0.0, 0.0, 8.0);
-	      double tickVal = (lastTime.length-firstTime.length)*(10.0/cast(double)TickDuration.ticksPerSec);
-	      glRotatef(tickVal, 0.0f, 1.0f, 0.0f);
-	      if (P1.ci.buttons[0])
-		drawSkeletonMesh(testSkel, testAnim, tickVal, true);
-	      else
-		drawSkeletonMesh(testSkel, otherAnim, tickVal, true);
-	      //printf("TV: %f\n", tickVal);
-	    glPopMatrix();
+	  // ManBody.useShaderProgram();
+	  // glPushMatrix();
+	    // glTranslatef(0.0,0.0,-15.0);
+	    // man1.update(dt.length / cast(double)TickDuration.ticksPerSec);
+	    // man1.render();
+	    // man2.update(0.03);
+	    // glTranslatef(5.0f, 1.0f, -2.0f);
+	    // man2.render();
+	    // glTranslatef(-5.0f, -1.0f, 2.0f);
+	    // glUseProgram(0);
+	    // glPushMatrix();
+	      // glTranslatef(0.0, 0.0, 8.0);
+	      // double tickVal = (lastTime.length-firstTime.length)*(10.0/cast(double)TickDuration.ticksPerSec);
+	      // glRotatef(tickVal, 0.0f, 1.0f, 0.0f);
+	      // if (P1.ci.buttons[0])
+		// drawSkeletonMesh(fighterSkeleton, fighterAnimKick, tickVal, true);
+	      // else
+		// drawSkeletonMesh(fighterSkeleton, fighterAnimSquat, tickVal, true);
+	      // //printf("TV: %f\n", tickVal);
+	    // glPopMatrix();
 	    
-	  glPopMatrix();
+	  // glPopMatrix();
 	  
 	  SDL_GL_SwapWindow( gWindow );
 	}
@@ -339,22 +361,31 @@ void realtime() @nogc
 	printf("Well done.\n");
 }
 
+
+struct Gamestate
+{
+	
+}
+
 Fighter P1;
 Fighter P2;
 Fighter[2] Players;
 
 void setupGame() @nogc
 {
-  P1 = make!Fighter(makeState!Idle(-10.0, 0.0));
-  P2 = make!Fighter(makeState!Idle(10.0, 0.0));
+  P1 = make!Fighter(makeState!Idle(-5.0, 0.0), fighterSkeleton);
+  P2 = make!Fighter(makeState!Idle(5.0, 0.0), fighterSkeleton);
   Players[0] = P1;
   Players[1] = P2;
 }
 
 void renderFighters() @nogc
 {
-  P1.render();
-  P2.render();
+	glPushMatrix();
+		glTranslatef(0.0, -2.0, -15.0);
+		P1.render();
+		P2.render();
+	glPopMatrix();
 }
 
 void collisions(Fighter first, Fighter second) @nogc
@@ -373,102 +404,158 @@ void gameUpdate() @nogc
 
 struct ControlInput
 {
-  enum vertDir {up, down, neutral};
-  enum horiDir {left, right, neutral};
+  enum VerticalDir {neutral = 0, up = 1, down = -1};
+  VerticalDir vertDir;
+  enum HorizontalDir {neutral = 0, left = -1, right = 1};
+  HorizontalDir horiDir;
+  
   bool[4] buttons;
+  
+  // void copyInput(ref ControlInput inp)
+  // {
+	// vertDir = inp.vertDir;
+	// horiDir = inp.horiDir;
+	
+	// foreach(int ii, bool button; inp.buttons)
+	// {
+		// buttons[ii] = button;
+	// }
+  // }
 }
 
 void setButtons(int playerNum, int controlNum) @nogc
 {
   if (gGameControllers[controlNum])
   {
+	with (Players[playerNum])
+	{
+		pi = ci;
+	}
+  
     with(Players[playerNum].ci)
     {
       int numButtons = SDL_JoystickNumButtons(gGameControllers[controlNum]);
       foreach (int ii, ref bool button; buttons)
-	if (ii < numButtons)
-	  button = 0 != SDL_JoystickGetButton(gGameControllers[controlNum], ii);
+		if (ii < numButtons)
+			button = 0 != SDL_JoystickGetButton(gGameControllers[controlNum], ii);
+		
+		ubyte dir = SDL_JoystickGetHat(gGameControllers[controlNum], 0);
+		 
+		if (dir == SDL_HAT_LEFTUP)
+			{vertDir = VerticalDir.up; horiDir = HorizontalDir.left;}
+		else if (dir == SDL_HAT_UP)
+			{vertDir = VerticalDir.up; horiDir = HorizontalDir.neutral;}
+		else if (dir == SDL_HAT_RIGHTUP)
+			{vertDir = VerticalDir.up; horiDir = HorizontalDir.right;}
+		else if (dir == SDL_HAT_LEFT)
+			{vertDir = VerticalDir.neutral; horiDir = HorizontalDir.left;}
+		else if (dir == SDL_HAT_CENTERED)
+			{vertDir = VerticalDir.neutral; horiDir = HorizontalDir.neutral;}
+		else if (dir == SDL_HAT_RIGHT)
+			{vertDir = VerticalDir.neutral; horiDir = HorizontalDir.right;}
+		else if (dir == SDL_HAT_LEFTDOWN)
+			{vertDir = VerticalDir.down; horiDir = HorizontalDir.left;}
+		else if (dir == SDL_HAT_DOWN)
+			{vertDir = VerticalDir.down; horiDir = HorizontalDir.neutral;}
+		else if (dir == SDL_HAT_RIGHTDOWN)
+			{vertDir = VerticalDir.down; horiDir = HorizontalDir.right;}
     }
   }
-}
-
-struct hittri
-{
-  
 }
 
 
 class Fighter
 {
-    this(State s) @nogc
-    {
-      state = s;
-      assert(s);
-    }
-    
-    ~this()  @nogc
-    {
-      //state should never be null
-      assert(state);
-      breakState(state);
-	
-      if(tempState)
-	breakState(tempState);
-    }
-  
-//   class Tech
-//   {
-//     State createUpdate(){return State(0, 0, new Idle());}
-//     void update(State s) {}
-//   }
-  
-  void createUpdate() @nogc
-  {
-    if (tempState) breakState(tempState);
-    tempState = state.makeUpdate(this);
-  }
-  void swapUpdate() @nogc
-  {
-    //state should never be null
-    assert(state);
-    if (tempState)
-    {
-      breakState(state);
-      state = tempState;
-      tempState = null;
-    }
-  }
-  
-  void render() @nogc
-  {
-    //Render quad
-    if( gRenderQuad )
-    {
-      const greal hsize = 8.0f/2.0f;
-      glPushMatrix();
-	glScalef(0.05f, 0.05f, 0.05f);
-	glTranslatef(cast(float)x, cast(float)y, -20.0f);
-	glBegin( GL_QUADS );
-	glColor4f(ci.buttons[0] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-	glVertex2f( -hsize, -hsize );
-	glColor4f(ci.buttons[1] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-	glVertex2f( hsize, -hsize );
-	glColor4f(ci.buttons[2] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-	glVertex2f( hsize, hsize );
-	glColor4f(ci.buttons[3] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-	glVertex2f( -hsize, hsize );
-	glEnd();
-      glPopMatrix();
-    }
+	@nogc
+	{
+		this(State s, Skeleton sk)
+		{
+		  state = s;
+		  skel = sk;
+		  assert(s);
+		}
+		
+		~this()
+		{
+		  //state should never be null
+		  assert(state);
+		  breakState(state);
+		
+		  if(tempState)
+			breakState(tempState);
+		}
 	  
-  }
-  
+	//   class Tech
+	//   {
+	//     State createUpdate(){return State(0, 0, new Idle());}
+	//     void update(State s) {}
+	//   }
+	  
+	  void createUpdate()
+	  {
+		if (tempState) breakState(tempState);
+		tempState = state.makeUpdate(this);
+	  }
+	  
+	  void swapUpdate()
+	  {
+		//state should never be null
+		assert(state);
+		if (tempState)
+		{
+		  breakState(state);
+		  state = tempState;
+		  tempState = null;
+		}
+	  }
+	  
+	  void render()
+	  {
+		//Render quad
+		if( gRenderQuad )
+		{
+		  const greal hsize = 8.0f/2.0f;
+		  glPushMatrix();
+			glScalef(0.05f, 0.05f, 0.05f);
+			glTranslatef(cast(float)x, cast(float)y, -20.0f);
+			glBegin( GL_QUADS );
+			glColor4f(ci.buttons[0] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+			glVertex2f( -hsize, -hsize );
+			glColor4f(ci.buttons[1] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+			glVertex2f( hsize, -hsize );
+			glColor4f(ci.buttons[2] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+			glVertex2f( hsize, hsize );
+			glColor4f(ci.buttons[3] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+			glVertex2f( -hsize, hsize );
+			glEnd();
+		  glPopMatrix();
+		}
+		else
+		{
+			glPushMatrix();
+				glTranslatef(cast(float)x, cast(float)y, 0.0f);
+				glRotatef(90.0, 0.0, 1.0, 0.0);
+				drawFighter(state);
+			glPopMatrix();
+		}
+		 
+		 
+	  }
+	  
+	  void drawFighter(State s)
+		{
+			s.animateState(this);
+		}
+	}
   public ControlInput ci;
   public ControlInput pi; //Previous input
   protected State state;
   protected State tempState;
+  public Skeleton skel;
   alias state this;
+  
 }
+
 
 
 
@@ -503,12 +590,37 @@ void breakState(State state)
 
 abstract class State
 {
-  this(greal x, greal y) @nogc
-  {this.x = x, this.y = y;}
+  this(greal X, greal Y) @nogc
+  {x = X; y = Y;}
   
   //~this() @nogc;
   
-  public greal x, y;
+  //public greal x, y;
+  public Vec3 pos;
+  // public alias x = pos.x;
+  // public alias y = pos.y;
+  
+  	@property @nogc {
+		vreal x(vreal V) 
+		{return pos.x = V;}
+		vreal x() const 
+		{return pos.x;}
+		
+		vreal y(vreal V) 
+		{return pos.y = V;}
+		vreal y() const 
+		{return pos.y;}
+		
+		vreal z(vreal V) 
+		{return pos.z = V;}
+		vreal z() const 
+		{return pos.z;}
+	}
+	
+	void animateState(Fighter f) @nogc
+	{
+		drawSkeletonMesh(f.skel, fighterAnimSquat, 0.0, true);
+	}
   
   State makeUpdate(Fighter parent) @nogc;
 }
@@ -530,6 +642,20 @@ class Idle : State
   }
 }
 
+class Step : State
+{
+   this(greal x, greal y) @nogc
+  {super(x,y);}
+
+	override State makeUpdate(Fighter parent) @nogc
+  {
+	x = x + parent.ci.horiDir;
+	y = y + parent.ci.vertDir;
+		
+	return makeState!Step(x,y);
+  }
+}
+
 class Duck : State
 {
   this(greal x, greal y) @nogc
@@ -543,6 +669,11 @@ class Duck : State
     else
       return makeState!Duck(x,y);
   }
+  
+  override void animateState(Fighter parent) @nogc
+	{
+		drawSkeletonMesh(parent.skel, fighterAnimKick, 20.0, true);
+	}
   
   double[10] weights;
 }

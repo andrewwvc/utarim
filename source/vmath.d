@@ -18,14 +18,39 @@ alias greal[16] GLMatrix;
 
 struct Vec3
 {
-	//vreal[3] values = 0;
+	vreal[3] values = 0;
 
-    vreal x=0;
-    vreal y=0;
-    vreal z=0;
-	//alias values this;
+    // vreal x=0;
+    // vreal y=0;
+    // vreal z=0;
+	
+	@property @nogc {
+		vreal x(vreal V) 
+		{return values[0] = V;}
+		vreal x() const 
+		{return values[0];}
+		
+		vreal y(vreal V) 
+		{return values[1] = V;}
+		vreal y() const 
+		{return values[1];}
+		
+		vreal z(vreal V) 
+		{return values[2] = V;}
+		vreal z() const 
+		{return values[2];}
+	}
+	
+	this(vreal X, vreal Y, vreal Z) @nogc
+		{x=X; y=Y; z=Z;}
 
-    string toString()
+    @property string toString() const
+    {
+        return stringof;
+    }
+	
+	
+	@property string stringof() const
     {
         return format("V[%f, %f, %f]", x, y, z);
     }
@@ -134,9 +159,14 @@ struct Quat
         k=v.z;
     }
 
-    string toString()
+    @property string toString() const
     {
-        return format("Q[%f, %f, %f, %f]", w, i, j, k);
+        return stringof;
+    }
+	
+	@property string stringof() const
+	{
+		return format("Q[%f, %f, %f, %f]", w, i, j, k);
     }
 
     @nogc
@@ -332,11 +362,20 @@ unittest
 	writeln(result);
 }
 
-Vec3 transformVec3(in ref GLMatrix mat, in ref Vec3 invec)
+Vec3 transformVec3(in ref GLMatrix mat, in ref Vec3 invec) @nogc
 {	
-	return Vec3(mat[0]*invec.x + mat[4]*invec.y + mat[8]*invec.z,
-		mat[1]*invec.x + mat[5]*invec.y + mat[9]*invec.z,
-		mat[2]*invec.x + mat[6]*invec.y + mat[10]*invec.z);
+	return Vec3(mat[0]*invec.x + mat[4]*invec.y + mat[8]*invec.z + mat[12],
+		mat[1]*invec.x + mat[5]*invec.y + mat[9]*invec.z + mat[13],
+		mat[2]*invec.x + mat[6]*invec.y + mat[10]*invec.z + mat[14]);
+}
+
+void matrixMultiply(ref GLMatrix lMat, ref GLMatrix rMat, ref GLMatrix outMat) @nogc
+{
+	for(int ii=0; ii<16; ii+=4)
+	{
+		for (int jj=0; jj<4; ++jj)
+			outMat[ii+jj] = lMat[jj+0]*rMat[ii+0] + lMat[jj+4]*rMat[ii+1] + lMat[jj+8]*rMat[ii+2] + lMat[jj+12]*rMat[ii+3];
+	}
 }
 
 struct Pill3
@@ -381,15 +420,6 @@ bool hullPointTest(ref Pill3 pill, ref Sphere3 sphere) @nogc
 		//printf("modPillMid: %s\n", modPillMid.toString());
 		Vec3 distVec = modPoint - modPillMid;
 		return distVec.length < dist;
-	}
-}
-
-void matrixMultiply(ref GLMatrix lMat, ref GLMatrix rMat, ref GLMatrix outMat) @nogc
-{
-	for(int ii=0; ii<16; ii+=4)
-	{
-		for (int jj=0; jj<4; ++jj)
-			outMat[ii+jj] = lMat[jj+0]*rMat[ii+0] + lMat[jj+4]*rMat[ii+1] + lMat[jj+8]*rMat[ii+2] + lMat[jj+12]*rMat[ii+3];
 	}
 }
 

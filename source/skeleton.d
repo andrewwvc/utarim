@@ -493,9 +493,9 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 } 
 
 
-bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GLMatrix posMat, ref Sphere3 ball) @nogc
+bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GLMatrix posMat, ref Sphere3[] balls) @nogc
 {
-    bool drawBone(int index, Quat[] f, Quat[] g, vreal interpolation, ref GLMatrix newMat) @nogc
+    bool testBone(int index, Quat[] f, Quat[] g, vreal interpolation, ref GLMatrix newMat) @nogc
     {
         //glPushMatrix();
 
@@ -521,8 +521,10 @@ bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GL
 			  [1-jj2-kk2, ij2+wk2,  ki2-wj2,  0,//b.vOffset.i,
 			  ij2-wk2,  1-ii2-kk2,  jk2+wi2,  0,//b.vOffset.j,
 			  ki2+wj2,  jk2-wi2,  1-ii2-jj2,  0,//b.vOffset.z,
-			  vOffset.x,  vOffset.y,  vOffset.z,  1];
+			  vOffset.x,  vOffset.y+fLength,  vOffset.z,  1];
 			  
+			  GLMatrix outmat=void;
+			  matrixMultiply(newMat, mat, outmat);
 			  
 
 			  //glMultMatrixf(mat.ptr);
@@ -532,23 +534,30 @@ bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GL
 			  // glDrawElements(GL_QUADS, cast(uint) indices.length, GL_UNSIGNED_BYTE, cast(const(void)*) indices.ptr);
 			  // glScalef(1.0, 1.0/fLength, 1.0); //This will not work with normal based lighting!
 			  // glTranslatef(0.0, fLength*0.5, 0.0);
+			  auto startV = Vec3(0,0-fLength,0);
+			  auto endV = Vec3(0,0,0);
 			  
-			  auto p3 = Pill3(1,Vec3(0,0,0),Vec3(1,0,0));
-			  if (hullPointTest(p3, ball))
-				return true;
-	      }
-
-
-	      foreach(int ii; Child)
-	      {
-			  if (ii != 0)
+			  auto p3 = Pill3(0.5, transformVec3(outmat, startV), transformVec3(outmat, endV));
+			  foreach (Sphere3 b; balls)
 			  {
-				 return drawBone(ii, f, g, interpolation, newMat);
+				  if (hullPointTest(p3, b))
+					return true;
 			  }
-	      }
+	      
+			bool areChildrenHit = false;
+
+			  foreach(int ii; Child)
+			  {
+				  if (ii != 0)
+				  {
+					 if (testBone(ii, f, g, interpolation, outmat))
+						return true;
+				  }
+			  }
 		  
-		  return false;
-	  }
+			return false;
+		  }
+		}
 	  
         //glPopMatrix();
     }
@@ -566,7 +575,7 @@ bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GL
 	    {
 	      if (b.Parent == -1)
 	      {
-		    if (drawBone(ii, frames[cast(uint)(fmin(frame, $-1))], frames[cast(uint)(fmin(frame+1, $-1))], interp, posMat))
+		    if (testBone(ii, frames[cast(uint)(fmin(frame, $-1))], frames[cast(uint)(fmin(frame+1, $-1))], interp, posMat))
 				return true;
 	      }
 	    }

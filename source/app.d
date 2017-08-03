@@ -627,8 +627,10 @@ abstract class State
 
 class Idle : State
 {
-  this(greal x, greal y) @nogc
-  {super(x,y);}
+	int timeFrame = 0;
+	
+  this(greal x, greal y, int time = 0) @nogc
+  {super(x,y); timeFrame = time;}
   
   //~this() @nogc {}
   
@@ -638,8 +640,13 @@ class Idle : State
     if (parent.ci.buttons[0])
       return makeState!Duck(x,y);
     else
-      return makeState!Idle(x,y);
+      return makeState!Idle(x,y, (timeFrame+1 > fighterAnimSquat.frameNos.length)? 0: timeFrame+1);
   }
+  
+  override void animateState(Fighter parent) @nogc
+	{
+		drawSkeletonMesh(parent.skel, fighterAnimSquat, timeFrame, true);
+	}
 }
 
 class Step : State

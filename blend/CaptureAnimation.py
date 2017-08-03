@@ -59,7 +59,7 @@ for action in acts:
 
     scene.frame_set(0)
     f.write(str(0)+'[\n')
-    #NOTE: Assumes the very first bone is the top of the hierarchy, and uses this to ascertain the reletive position from the origin
+    #NOTE: Assumes the very first bone is the top of the hierarchy, and uses this to ascertain the relative position from the origin
     topVec = pose_bones[0].location
     f.write('[' + str(topVec.x) + ', ' + str(topVec.y) + ', ' + str(topVec.z) + ']\n')
     for pose_bone in pose_bones:
@@ -78,7 +78,7 @@ for action in acts:
         candidatePoseVal = storePoseBones(pose_bones)
         if (currentPoseVal != candidatePoseVal):
             f.write(str(frame)+'[\n')
-            #NOTE: Assumes the very first bone is the top of the hierarchy, and uses this to ascertain the reletive position from the origin
+            #NOTE: Assumes the very first bone is the top of the hierarchy, and uses this to ascertain the relative position from the origin
             topVec = pose_bones[0].location
             f.write('[' + str(topVec.x) + ', ' + str(topVec.y) + ', ' + str(topVec.z) + ']\n')
             for pose_bone in pose_bones:

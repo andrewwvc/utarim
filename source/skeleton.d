@@ -28,7 +28,7 @@ void zeroifyQuat(ref Quat q, vreal threshold = 1.0e-5)
 void purifyQuat(ref Quat q)
 {
   zeroifyQuat(q);
-  q.normalise();
+  q.normalize();
 }
 
 unittest

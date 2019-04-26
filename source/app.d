@@ -2,16 +2,18 @@ import std.stdio;
 import core.memory;
 import derelict.sdl2.sdl;
 import derelict.opengl3.gl;
-import m3.m3;
+//import m3.m3;
 import vmath;
 import skeleton;
 import manbody;
 import core.time;
+import core.thread;
 import collisiondet;
 
 import allocator.building_blocks.free_list;
 import allocator.mallocator;
 import std.traits;
+import std.conv;
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
@@ -69,15 +71,15 @@ void setupControllers() nothrow @nogc
   printf( "Number of joysticks connected: %i\n", numJoys);
 	
   //Check for joysticks
-  if( SDL_NumJoysticks() < 1 )
+  if( numJoys < 1 )
     { printf( "Warning: No joysticks connected!\n\n" ); }
   else
   {
-    foreach (int ii; 0..SDL_NumJoysticks())
+    foreach (int ii; 0..numJoys)
     {
       SDL_Joystick* controler = SDL_JoystickOpen(ii);
       if(null == controler)
-	printf( "Warning: Unable to open game controller! SDL Error: %s\n", SDL_GetError());
+		printf( "Warning: Unable to open game controller! SDL Error: %s\n", SDL_GetError());
       else
       {
 	printf("Name: %s\n", SDL_JoystickNameForIndex(ii));
@@ -97,6 +99,54 @@ void takedownControllers() @nogc
   foreach (SDL_Joystick* joy; gGameControllers)
     if (joy)
       SDL_JoystickClose(joy);
+}
+
+void attachControler(int id) @nogc
+{
+	if (id < gGameControllers.length)
+	{
+		if (gGameControllers[id])
+		{
+			SDL_JoystickClose(gGameControllers[id]);
+		}
+		
+		SDL_Joystick* controler = SDL_JoystickOpen(id);
+		
+		if (null == controler)
+			{printf( "Warning: Unable to open game controller! SDL Error: %s\n", SDL_GetError());}
+		else
+		{
+			printf("Name: %s\n", SDL_JoystickNameForIndex(id));
+			printf("\tNumber of Axes: %d\n", SDL_JoystickNumAxes(controler));
+			printf("\tNumber of Buttons: %d\n", SDL_JoystickNumButtons(controler));
+			printf("\tNumber of Balls: %d\n\n", SDL_JoystickNumBalls(controler));
+			
+			if ((id == 1 && gGameControllers[0] == controler) || (id == 0 && gGameControllers[1] == controler))
+			{
+				printf("Warning: Controler double assignment was attempted.\n");
+			}
+			else
+			{
+				gGameControllers[id] = controler;
+			}
+			
+		}
+	}
+	else
+	{
+		printf("Warning: New controler is over the length limit of the number of accepted controlers.\n");
+	}
+}
+
+//Checks that each controler is still atttached
+void clearControlers(int id) @nogc
+{
+	
+}
+
+void removeControler(SDL_GameController* controler) @nogc
+{
+	
 }
 
 
@@ -145,8 +195,8 @@ void main()
 	DerelictGL.reload();
 	
 	//Use Vsync
-	if( SDL_GL_SetSwapInterval( 1 ) < 0 )
-	  { printf( "Warning: Unable to set VSync! SDL Error: %s\n", SDL_GetError() ); }
+	//if( SDL_GL_SetSwapInterval( 1 ) < 0 )
+	 // { printf( "Warning: Unable to set VSync! SDL Error: %s\n", SDL_GetError() ); }
 	//Initialize OpenGL
 	//if( !initGL() )
 	//  { printf( "Unable to initialize OpenGL!\n" ); return; }
@@ -251,6 +301,7 @@ void main()
         realtime();
 }
 
+
 void realtime() @nogc
 {
 	//The images
@@ -277,6 +328,8 @@ void realtime() @nogc
 	TickDuration firstTime = lastTime;
 	TickDuration newTime;
 	TickDuration dt;
+	long nanoFrameDuration = 1000000000/60;
+	printf("microFrameDuration: %i \n", nanoFrameDuration);
       
 	//While application is running
 	while( !quit )
@@ -309,13 +362,32 @@ void realtime() @nogc
 		//SDL_BlitSurface( helloWorld, null, screenSurface, null);
 	      }
 	    }
+		else if (e.type == SDL_JOYDEVICEREMOVED)
+		{
+			SDL_JoystickID controler_instance = e.jdevice.which;
+			printf("CONTROLER INSTANCE #%i DISCONNECTED!\n", controler_instance);
+			
+			SDL_GameController* disconected_control = SDL_GameControllerFromInstanceID(controler_instance);
+			if (disconected_control)
+			{
+				removeControler(disconected_control);
+			}
+			else
+			{
+				printf("CONTROLER INSTANCE #%i's reference could not be found.\n", controler_instance);
+			}
+			
+			printf("Number of joysticks connected: %i\n", SDL_NumJoysticks());
+			
+		}
+		else if (e.type == SDL_JOYDEVICEADDED)
+		{
+			printf("CONTROLER DEVICE #%i CONNECTED!\n", e.jdevice.which);
+			attachControler(e.jdevice.which);
+			printf("Number of joysticks connected: %i\n", SDL_NumJoysticks());
+		}
 	    
 	  }
-
-	  //Time update
-	  newTime = TickDuration.currSystemTick();
-	  dt = newTime - lastTime;
-	  lastTime = newTime;
 	  
 	  setButtons(0, 0);
 	  setButtons(1, 1);
@@ -354,6 +426,25 @@ void realtime() @nogc
 	  // glPopMatrix();
 	  
 	  SDL_GL_SwapWindow( gWindow );
+	  
+	  //Time update
+	  newTime = TickDuration.currSystemTick();
+	  dt = newTime - lastTime;
+	  //printf("dt: %i \n", dt.usecs);
+	  
+	  
+	  //Slows down framerate if time passes too quickly
+	  //Thread.sleep(dur!("nsecs")(nanoFrameDuration - dt.nsecs));
+	  
+	  //This is a basic loop that waits and holds the CPU until the time is ready for a new frame, ideally this shoudl be changes to a sleep() function
+	  while (dt.nsecs < nanoFrameDuration)
+	  {
+		
+		newTime = TickDuration.currSystemTick();
+		dt = newTime - lastTime;
+	  }
+	  
+	  lastTime = newTime;
 	}
 
         //Prints on safe exit
@@ -367,14 +458,20 @@ struct Gamestate
 	
 }
 
+
+
 Fighter P1;
 Fighter P2;
 Fighter[2] Players;
+const size_t FighterSize = __traits(classInstanceSize, Fighter);
+void[FighterSize*2] FighterData;
 
 void setupGame() @nogc
 {
-  P1 = make!Fighter(makeState!Idle(-5.0, 0.0), fighterSkeleton);
-  P2 = make!Fighter(makeState!Idle(5.0, 0.0), fighterSkeleton);
+  //P1 = make!Fighter(makeState!Idle(-5.0, 0.0), fighterSkeleton);
+  //P2 = make!Fighter(makeState!Idle(5.0, 0.0), fighterSkeleton);
+  P1 = emplace!Fighter(FighterData[0..FighterSize], makeState!Idle(-5.0, 0.0), fighterSkeleton);
+  P2 = emplace!Fighter(FighterData[FighterSize..$], makeState!Idle(5.0, 0.0), fighterSkeleton);
   Players[0] = P1;
   Players[1] = P2;
 }
@@ -559,8 +656,8 @@ class Fighter
 
 
 
-const size_t minStateSize = SizeOf!(Idle);
-const size_t maxStateSize = SizeOf!(Duck);
+const size_t minStateSize = __traits(classInstanceSize, Idle); //SizeOf!(Idle);
+const size_t maxStateSize = __traits(classInstanceSize, Duck); //SizeOf!(Duck);
 FreeList!(Mallocator, minStateSize, maxStateSize) stateFreeList;
 
 
@@ -569,7 +666,7 @@ FreeList!(Mallocator, minStateSize, maxStateSize) stateFreeList;
 auto makeState(T, Args...)(auto ref Args args) if (is(T : State))
 {
   //enum size_t SIZE = SizeOf!(T);
-  auto mem = stateFreeList.allocate(SizeOf!(T));
+  auto mem = stateFreeList.allocate(__traits(classInstanceSize, T));
   
   return emplace!(T)(mem, args);
 }

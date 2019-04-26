@@ -120,7 +120,7 @@ struct Vec3
 
     //Returns the normalised unit Vector
     @nogc
-    Vec3 normalise()
+    Vec3 normalize()
     {
         vreal normInv = 1/length();
         return Vec3(x*normInv, y*normInv, z*normInv);
@@ -215,7 +215,7 @@ struct Quat
 
     //Returns the normalised unit Quaternion
     @nogc
-    Quat normalise()
+    Quat normalize()
     {
         greal normInv = 1/norm();
         return Quat(w*normInv, i*normInv, j*normInv, k*normInv);
@@ -313,34 +313,76 @@ Quat lerp(ref Quat q1, ref Quat q2, vreal interp)
   return q1*(1.0- interp) + q2*interp;
 }
 
-@nogc
-Quat slerp(ref Quat q1, ref Quat q2, vreal interp, vreal threshold = 0.95f /*Value should be between 0.0 and 1.0*/)
-{
-  vreal cosine = dotProduct(q1, q2);
+// @nogc
+// Quat slerp(ref Quat q1, ref Quat q2, vreal interp, vreal threshold = 0.95f /*Value should be between 0.0 and 1.0*/)
+// {
+  // vreal cosine = dotProduct(q1, q2);
   
-  if (cosine < 0.0f)
-  {
-    q1.w *= -1.0f;
-    q1.i *= -1.0f;
-    q1.j *= -1.0f;
-    q1.k *= -1.0f;
-    cosine *= -1.0f;
-  }
+  // if (cosine < 0.0f)
+  // {
+    // q1.w *= -1.0f;
+    // q1.i *= -1.0f;
+    // q1.j *= -1.0f;
+    // q1.k *= -1.0f;
+    // cosine *= -1.0f;
+  // }
   
-  if (cosine <= threshold) // spherical interpolation
-  {
-    const vreal theta = acos(cosine);
-    const vreal invsintheta = 1.0/(sin(theta));
-    const vreal scale = sin(theta * (1.0f-interp)) * invsintheta;
-    const vreal invscale = sin(theta * interp) * invsintheta;
-    return ((q1*scale) + (q2*invscale));
-  }
-  else // linear interpolation
-  {
-    return lerp(q1,q2,interp);
-  }
-}
+  // if (cosine <= threshold) // spherical interpolation
+  // {
+    // const vreal theta = acos(cosine);
+    // const vreal invsintheta = 1.0/(sin(theta));
+    // const vreal scale = sin(theta * (1.0f-interp)) * invsintheta;
+    // const vreal invscale = sin(theta * interp) * invsintheta;
+    // return ((q1*scale) + (q2*invscale));
+  // }
+  // else // linear interpolation
+  // {
+    // return lerp(q1,q2,interp);
+  // }
+// }
 
+//Modified from https://en.wikipedia.org/wiki/Slerp
+@nogc
+Quat slerp(Quat v0, Quat v1, vreal t)
+{
+    // Only unit quaternions are valid rotations.
+    // Normalize to avoid undefined behavior.
+    v0.normalize();
+    v1.normalize();
+
+    // Compute the cosine of the angle between the two vectors.
+    vreal dot = v0.dotProduct(v1);
+
+    // If the dot product is negative, slerp won't take
+    // the shorter path. Note that v1 and -v1 are equivalent when
+    // the negation is applied to all four components. Fix by 
+    // reversing one quaternion.
+    if (dot < 0.0f) {
+        v1 = -v1;
+        dot = -dot;
+    }  
+
+    const vreal DOT_THRESHOLD = 0.9995;
+    if (dot > DOT_THRESHOLD) {
+        // If the inputs are too close for comfort, linearly interpolate
+        // and normalize the result.
+
+        Quat result = v0 + t*(v1 - v0);
+        //result.normalize();
+        return result.normalize();
+    }
+
+    // Since dot is in range [0, DOT_THRESHOLD], acos is safe
+    vreal theta_0 = acos(dot);        // theta_0 = angle between input vectors
+    vreal theta = theta_0*t;          // theta = angle between v0 and result
+    vreal sin_theta = sin(theta);     // compute this value only once
+    vreal sin_theta_0 = sin(theta_0); // compute this value only once
+
+    vreal s0 = cos(theta) - dot * sin_theta / sin_theta_0;  // == sin(theta_0 - theta) / sin(theta_0)
+    vreal s1 = sin_theta / sin_theta_0;
+
+    return (s0 * v0) + (s1 * v1);
+}
 
 unittest
 {

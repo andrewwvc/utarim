@@ -62,6 +62,7 @@ void setupSkelGL()
 
 //Globals
 SDL_Joystick*[2] gGameControllers;
+//SDL_JoystickID[2] gGameControlerInstanceIDs;
 
 void setupControllers() nothrow @nogc
 {
@@ -144,9 +145,20 @@ void clearControlers(int id) @nogc
 	
 }
 
-void removeControler(SDL_GameController* controler) @nogc
+void removeControler(int id) @nogc
 {
-	
+	if (id < gGameControllers.length)
+	{
+		if (gGameControllers[id])
+		{
+			SDL_JoystickClose(gGameControllers[id]);
+			gGameControllers[id] = null;
+		}
+	}
+	else
+	{
+		printf("Warning: Attempted to remove controler index that is over the length limit of the number of accepted controlers.\n");
+	}
 }
 
 
@@ -367,15 +379,25 @@ void realtime() @nogc
 			SDL_JoystickID controler_instance = e.jdevice.which;
 			printf("CONTROLER INSTANCE #%i DISCONNECTED!\n", controler_instance);
 			
-			SDL_GameController* disconected_control = SDL_GameControllerFromInstanceID(controler_instance);
-			if (disconected_control)
+			//SDL_GameController* disconected_control = SDL_GameControllerFromInstanceID(controler_instance);
+			SDL_JoystickID[gGameControllers.length] gGameControlerInstanceIDs;
+			foreach (int index, SDL_JoystickID inst; gGameControlerInstanceIDs)
 			{
-				removeControler(disconected_control);
+				gGameControlerInstanceIDs[index] = SDL_JoystickInstanceID(gGameControllers[index]);
+				if (gGameControlerInstanceIDs[index] == controler_instance)
+				{
+					removeControler(index);
+				}
 			}
-			else
-			{
-				printf("CONTROLER INSTANCE #%i's reference could not be found.\n", controler_instance);
-			}
+			
+			// if (disconected_control)
+			// {
+				// removeControler(disconected_control);
+			// }
+			// else
+			// {
+				// printf("CONTROLER INSTANCE #%i's reference could not be found.\n", controler_instance);
+			// }
 			
 			printf("Number of joysticks connected: %i\n", SDL_NumJoysticks());
 			

@@ -16,8 +16,8 @@ import std.traits;
 import std.conv;
 
 //Screen dimension constants
-const int SCREEN_WIDTH = 640;
-const int SCREEN_HEIGHT = 640;
+const int SCREEN_WIDTH = 1280;
+const int SCREEN_HEIGHT = 1024;
 
 SDL_Window* gWindow;
 
@@ -389,15 +389,6 @@ void realtime() @nogc
 					removeControler(index);
 				}
 			}
-			
-			// if (disconected_control)
-			// {
-				// removeControler(disconected_control);
-			// }
-			// else
-			// {
-				// printf("CONTROLER INSTANCE #%i's reference could not be found.\n", controler_instance);
-			// }
 			
 			printf("Number of joysticks connected: %i\n", SDL_NumJoysticks());
 			

@@ -56,6 +56,10 @@ struct Bone
     Vec3 vOffset;
     //real fHingeAngle, fMin, fMax; //For inverse kinematics
     greal fLength;
+	GLfloat[24] boneVolume = cubeVerts;
+	GLuint boneVolumeID;
+	GLfloat[24] boneNormals;
+	GLuint boneNormalID;
     int nJointType;
     int[MAX_BONE_CHILDREN] Child;
     int Parent;
@@ -73,6 +77,24 @@ struct Animation
   Quat[][] frames;
   Vec3[] framePos;
   int[] frameNos;
+}
+
+GLfloat[24] generateBoneVolume(greal fLength)
+{
+	return [
+	    -0.25, 0.5*fLength, 0.25,  0.25, 0.5*fLength, 0.25,   -0.25, -0.5*fLength, 0.25,    0.25, -0.5*fLength, 0.25,
+	    -0.25, 0.5*fLength, -0.25,  0.25, 0.5*fLength, -0.25,   -0.25, -0.5*fLength, -0.25,    0.25, -0.5*fLength, -0.25];
+}
+
+void setupBoneVolumeBuffer(GLuint* volumeID, GLfloat[24]* boneVolume)
+{
+  glGenBuffers(1, volumeID);
+  glBindBuffer(GL_ARRAY_BUFFER, *volumeID);
+  glBufferData(GL_ARRAY_BUFFER, boneVolume.sizeof, cast(void*)boneVolume, GL_STATIC_DRAW);
+
+  // bind with 0, so, switch back to normal pointer operation
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
 }
 
 Skeleton makeSkeletonFile(string filename)
@@ -102,6 +124,8 @@ Skeleton makeSkeletonFile(string filename)
 	    lineBuffer = handle.readln();
 	    debug writeln("lb: ", lineBuffer);
 	    fLength = parse!double(lineBuffer);
+		boneVolume = generateBoneVolume(fLength);
+		setupBoneVolumeBuffer(&boneVolumeID, &boneVolume);
 	    lineBuffer = handle.readln();
 	    debug writeln("lb: ", lineBuffer);
 	    Parent =  parse!int(lineBuffer);
@@ -331,9 +355,13 @@ public static GLfloat[] cubeVerts = [
 	    -0.5, -0.5, -0.5, -0.5, -0.5, 0.5,   -0.5, 0.5, 0.5,  -0.5, 0.5, -0.5];
 */
 
+// public const static GLfloat[] cubeVerts = [
+	    // -0.5, 0.5, 0.5,  0.5, 0.5, 0.5,   -0.5, -0.5, 0.5,    0.5, -0.5, 0.5,
+	    // -0.5, 0.5, -0.5,  0.5, 0.5, -0.5,   -0.5, -0.5, -0.5,    0.5, -0.5, -0.5];
+		
 public const static GLfloat[] cubeVerts = [
-	    -0.5, 0.5, 0.5,  0.5, 0.5, 0.5,   -0.5, -0.5, 0.5,    0.5, -0.5, 0.5,
-	    -0.5, 0.5, -0.5,  0.5, 0.5, -0.5,   -0.5, -0.5, -0.5,    0.5, -0.5, -0.5];
+	    -0.25, 0.5, 0.25,  0.25, 0.5, 0.25,   -0.25, -0.5, 0.25,    0.25, -0.5, 0.25,
+	    -0.25, 0.5, -0.25,  0.25, 0.5, -0.25,   -0.25, -0.5, -0.25,    0.25, -0.5, -0.25];
 
 
 const  static GLubyte[] indices = [// 24 of indices
@@ -402,19 +430,20 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 		  //glTranslatef(b.vOffset.x, b.vOffset.y, b.vOffset.z);
 		  //glRotatef(b.qRotate.w, b.qRotate.i, b.qRotate.j, b.qRotate.k);
 		  glTranslatef(0.0, fLength*0.5, 0.0);
-		  glScalef(1.0, fLength, 1.0);
+		  //glScalef(1.0, fLength, 1.0);
+		  glVertexPointer(3, GL_FLOAT, 0, boneVolume.ptr);
 		  glDrawElements(GL_QUADS, cast(uint) indices.length, GL_UNSIGNED_BYTE, cast(const(void)*) indices.ptr);
-		  glScalef(1.0, 1.0/fLength, 1.0); //This will not work with normal based lighting!
+		  //glScalef(1.0, 1.0/fLength, 1.0); //This will not work with normal based lighting!
 		  glTranslatef(0.0, fLength*0.5, 0.0);
 	      }
 
 
 	      foreach(int ii; Child)
 	      {
-		  if (ii != 0)
-		  {
-		    drawBone(ii, f, g, interpolation, col*0.8);
-		  }
+			  if (ii != 0)
+			  {
+				drawBone(ii, f, g, interpolation, col*0.8);
+			  }
 	      }
 	  }
 	  
@@ -425,6 +454,7 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
     glMatrixMode(GL_MODELVIEW);
 
 	glEnableClientState(GL_VERTEX_ARRAY);
+	
         glVertexPointer(3, GL_FLOAT, 0, cubeVerts.ptr);
 
         //glIndexPointer();
@@ -434,60 +464,62 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
         
         with (anim)
         {
-        
-	  int maxFrame = frameNos[$-1];
-	  int minFrame = frameNos[0];
-	  //printf("len: %i\n", maxFrame);
-	  
-	  if (true)
-	  {
-	    real frame;
-	    real interp = modf(fvalue, frame);
-	    foreach(int ii, Bone b; skel.bones)
-	    {
-	      if (b.Parent == -1)
-	      {
-		if (loop)
-		{
-		    uint iframe = cast(uint)(frame);
-		    drawBone(ii, frames[iframe%$], frames[(iframe+1)%$], interp, 1.0);
+			
+		  int maxFrame = frameNos[$-1];
+		  int minFrame = frameNos[0];
+		  //printf("len: %i\n", maxFrame);
+		  
+		  if (true)
+		  {
+			real frame;
+			real interp = modf(fvalue, frame);
+			foreach(int ii, Bone b; skel.bones)
+			{
+			  if (b.Parent == -1)
+			  {
+				if (loop)
+				{
+					uint iframe = cast(uint)(frame);
+					drawBone(ii, frames[iframe%$], frames[(iframe+1)%$], interp, 1.0);
+				}
+				else
+				{
+					drawBone(ii, frames[cast(uint)(fmin(frame, $-1))], frames[cast(uint)(fmin(frame+1, $-1))], interp, 1.0);
+				}
+			  }
+			}
+		  }
+		  else
+		  {
+			//Find frames
+			int fseed = 0;
+			
+			vreal internalVal = (fvalue % (maxFrame-minFrame)) + minFrame;
+			if (internalVal >= maxFrame)
+			  internalVal = minFrame;
+			
+			//printf("intVal: %f\n", internalVal);
+			while (!(frameNos[fseed] <= internalVal && internalVal < frameNos[fseed+1]))
+			  {++fseed;}
+			  
+			internalVal = (internalVal - frameNos[fseed]) / (frameNos[fseed+1]-frameNos[fseed]);
+			
+			Vec3 posA = anim.framePos[fseed].mult(1.0-internalVal);
+			Vec3 posB = anim.framePos[fseed+1].mult(internalVal);
+			Vec3 pos = posA+posB;
+			
+			glTranslatef(pos.x, pos.y, pos.z);
+			  
+			  foreach(int ii, Bone b; skel.bones)
+			  {
+			if (b.Parent == -1)
+			{
+			  drawBone(ii, frames[fseed], frames[fseed+1], internalVal, 1.0);
+			}
+			  }
+			glTranslatef(-pos.x, -pos.y, -pos.z);
+		  }
 		}
-		else
-		    drawBone(ii, frames[cast(uint)(fmin(frame, $-1))], frames[cast(uint)(fmin(frame+1, $-1))], interp, 1.0);
-	      }
-	    }
-	  }
-	  else
-	  {
-	    //Find frames
-	    int fseed = 0;
-	    
-	    vreal internalVal = (fvalue % (maxFrame-minFrame)) + minFrame;
-	    if (internalVal >= maxFrame)
-	      internalVal = minFrame;
-	    
-	    //printf("intVal: %f\n", internalVal);
-	    while (!(frameNos[fseed] <= internalVal && internalVal < frameNos[fseed+1]))
-	      {++fseed;}
-	      
-	    internalVal = (internalVal - frameNos[fseed]) / (frameNos[fseed+1]-frameNos[fseed]);
-	    
-	    Vec3 posA = anim.framePos[fseed].mult(1.0-internalVal);
-	    Vec3 posB = anim.framePos[fseed+1].mult(internalVal);
-	    Vec3 pos = posA+posB;
-	    
-	    glTranslatef(pos.x, pos.y, pos.z);
-	      
-	      foreach(int ii, Bone b; skel.bones)
-	      {
-		if (b.Parent == -1)
-		{
-		  drawBone(ii, frames[fseed], frames[fseed+1], internalVal, 1.0);
-		}
-	      }
-	    glTranslatef(-pos.x, -pos.y, -pos.z);
-	  }
-	}
 
 	glDisableClientState(GL_VERTEX_ARRAY);
 } 

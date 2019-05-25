@@ -364,10 +364,15 @@ public const static GLfloat[] cubeVerts = [
 	    -0.25, 0.5, -0.25,  0.25, 0.5, -0.25,   -0.25, -0.5, -0.25,    0.25, -0.5, -0.25];
 		
 public const static GLfloat invSqrt3 = 1/sqrt(cast(GLfloat)(3.0f));
+public const static GLfloat invSqrt2 = 1/sqrt(cast(GLfloat)(2.0f));
 		
 public const static GLfloat[] cubeNormals = [
 	    -invSqrt3, invSqrt3, invSqrt3,  invSqrt3, invSqrt3, invSqrt3,   -invSqrt3, -invSqrt3, invSqrt3,    invSqrt3, -invSqrt3, invSqrt3,
 	    -invSqrt3, invSqrt3, -invSqrt3,  invSqrt3, invSqrt3, -invSqrt3,   -invSqrt3, -invSqrt3, -invSqrt3,    invSqrt3, -invSqrt3, -invSqrt3];
+		
+public const static GLfloat[] cubeNormalsSideways = [
+	    -invSqrt2, 0, invSqrt2,  invSqrt2, 0, invSqrt2,   -invSqrt2, 0, invSqrt2,    invSqrt2, 0, invSqrt2,
+	    -invSqrt2, 0, -invSqrt2,  invSqrt2, 0, -invSqrt2,   -invSqrt2, 0, -invSqrt2,    invSqrt2, -0, -invSqrt2];
 
 
 const  static GLubyte[] indices = [// 24 of indices

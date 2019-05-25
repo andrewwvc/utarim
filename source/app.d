@@ -14,6 +14,7 @@ import allocator.building_blocks.free_list;
 import allocator.mallocator;
 import std.traits;
 import std.conv;
+import std.meta;
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 1280;
@@ -419,7 +420,7 @@ void realtime() @nogc
 	  
 	  const static float[] ambientLight = [0.2f, 0.2f, 0.2f, 1.0f];
 	  const static float[] diffuseLight = [0.8f, 0.8f, 0.8f, 1.0f];
-	  const static float[] positionLight = [0.0f, 0.0f, 1.0f, 0.0f];
+	  const static float[] positionLight = [0.0f, 0.0f, 0.0f, 1.0f];
 	  
 	  glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight.ptr);
 	  glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight.ptr);
@@ -679,15 +680,44 @@ class Fighter
   protected State state;
   protected State tempState;
   public Skeleton skel;
+  public greal halfWidth = 50.0;
   alias state this;
   
 }
 
 
+alias StateList = AliasSeq!(Idle, Step, Duck);
 
+pure size_t maxStateSizeCalc()
+{
+	size_t maximum = 0;
+	
+	foreach (sym;  StateList)
+	{
+		size_t cSize = __traits(classInstanceSize, sym);
+		if (cSize > maximum)
+			maximum = cSize;
+	}
+	
+	return maximum;
+}
 
-const size_t minStateSize = __traits(classInstanceSize, Idle); //SizeOf!(Idle);
-const size_t maxStateSize = __traits(classInstanceSize, Duck); //SizeOf!(Duck);
+pure size_t mimStateSizeCalc()
+{
+	size_t minimum = size_t.max;
+	
+	foreach (sym;  StateList)
+	{
+		size_t cSize = __traits(classInstanceSize, sym);
+		if (cSize > minimum)
+			minimum = cSize;
+	}
+	
+	return minimum;
+}
+
+const size_t minStateSize = maxStateSizeCalc(); //__traits(classInstanceSize, Idle); //SizeOf!(Idle);
+const size_t maxStateSize = mimStateSizeCalc(); //__traits(classInstanceSize, Duck); //SizeOf!(Duck);
 FreeList!(Mallocator, minStateSize, maxStateSize) stateFreeList;
 
 
@@ -744,20 +774,44 @@ abstract class State
 		{return pos.z;}
 	}
 	
-	void animateState(Fighter f) @nogc
+	void animateState(Fighter parent) @nogc
 	{
-		drawSkeletonMesh(f.skel, fighterAnimSquat, 0.0, true);
+		drawSkeletonMesh(parent.skel, fighterAnimSquat, 1, true);
 	}
   
   State makeUpdate(Fighter parent) @nogc;
 }
 
-class Idle : State
+abstract class AnimatedState : State
 {
+	Animation* anim;
 	int timeFrame = 0;
 	
+	this(greal x, greal y, int time = 0) @nogc
+	{super(x,y); timeFrame = time;}
+	
+	Animation* getAnim() @nogc
+	{
+		return anim;
+	}
+	
+	// void animateState(Fighter f) @nogc
+	// {
+		// drawSkeletonMesh(f.skel, getAnim(), 0.0, true);
+	// }
+	
+	override void animateState(Fighter parent) @nogc
+	{
+		drawSkeletonMesh(parent.skel, *getAnim(), timeFrame, true);
+	}
+}
+
+class Idle : AnimatedState
+{
+	// int timeFrame = 0;
+	
   this(greal x, greal y, int time = 0) @nogc
-  {super(x,y); timeFrame = time;}
+  {super(x,y,time); anim = &fighterAnimKick;}
   
   //~this() @nogc {}
   
@@ -766,14 +820,11 @@ class Idle : State
     //debug printf("Idle\n");
     if (parent.ci.buttons[0])
       return makeState!Duck(x,y);
-    else
-      return makeState!Idle(x,y, (timeFrame+1 > fighterAnimSquat.frameNos.length)? 0: timeFrame+1);
+    else if (parent.ci.horiDir != ControlInput.HorizontalDir.neutral)
+		return makeState!Idle(x+parent.ci.horiDir*0.1 ,y, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+	else
+      return makeState!Idle(x,y, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
   }
-  
-  override void animateState(Fighter parent) @nogc
-	{
-		drawSkeletonMesh(parent.skel, fighterAnimSquat, timeFrame, true);
-	}
 }
 
 class Step : State
@@ -790,10 +841,10 @@ class Step : State
   }
 }
 
-class Duck : State
+class Duck : AnimatedState
 {
-  this(greal x, greal y) @nogc
-  {super(x,y);}
+  this(greal x, greal y, int time = 0) @nogc
+  {super(x,y,time); anim = &fighterAnimSquat;}
   
   override State makeUpdate(Fighter parent) @nogc
   {
@@ -801,13 +852,8 @@ class Duck : State
     if (parent.ci.buttons[1])
       return makeState!Idle(x,y);
     else
-      return makeState!Duck(x,y);
+      return makeState!Duck(x,y, timeFrame+1);
   }
-  
-  override void animateState(Fighter parent) @nogc
-	{
-		drawSkeletonMesh(parent.skel, fighterAnimKick, 20.0, true);
-	}
   
   double[10] weights;
 }

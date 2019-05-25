@@ -362,6 +362,12 @@ public static GLfloat[] cubeVerts = [
 public const static GLfloat[] cubeVerts = [
 	    -0.25, 0.5, 0.25,  0.25, 0.5, 0.25,   -0.25, -0.5, 0.25,    0.25, -0.5, 0.25,
 	    -0.25, 0.5, -0.25,  0.25, 0.5, -0.25,   -0.25, -0.5, -0.25,    0.25, -0.5, -0.25];
+		
+public const static GLfloat invSqrt3 = 1/sqrt(cast(GLfloat)(3.0f));
+		
+public const static GLfloat[] cubeNormals = [
+	    -invSqrt3, invSqrt3, invSqrt3,  invSqrt3, invSqrt3, invSqrt3,   -invSqrt3, -invSqrt3, invSqrt3,    invSqrt3, -invSqrt3, invSqrt3,
+	    -invSqrt3, invSqrt3, -invSqrt3,  invSqrt3, invSqrt3, -invSqrt3,   -invSqrt3, -invSqrt3, -invSqrt3,    invSqrt3, -invSqrt3, -invSqrt3];
 
 
 const  static GLubyte[] indices = [// 24 of indices
@@ -432,6 +438,7 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 		  glTranslatef(0.0, fLength*0.5, 0.0);
 		  //glScalef(1.0, fLength, 1.0);
 		  glVertexPointer(3, GL_FLOAT, 0, boneVolume.ptr);
+		  glNormalPointer(GL_FLOAT, 0, cubeNormals.ptr);
 		  glDrawElements(GL_QUADS, cast(uint) indices.length, GL_UNSIGNED_BYTE, cast(const(void)*) indices.ptr);
 		  //glScalef(1.0, 1.0/fLength, 1.0); //This will not work with normal based lighting!
 		  glTranslatef(0.0, fLength*0.5, 0.0);
@@ -454,6 +461,7 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
     glMatrixMode(GL_MODELVIEW);
 
 	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_NORMAL_ARRAY);
 	
         glVertexPointer(3, GL_FLOAT, 0, cubeVerts.ptr);
 
@@ -520,7 +528,8 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 			glTranslatef(-pos.x, -pos.y, -pos.z);
 		  }
 		}
-
+	
+	glDisableClientState(GL_NORMAL_ARRAY);
 	glDisableClientState(GL_VERTEX_ARRAY);
 } 
 

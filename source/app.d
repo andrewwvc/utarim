@@ -413,6 +413,23 @@ void realtime() @nogc
 	  
 	  //mProgram.useFixed();
 	  glUseProgram(0);
+	  
+	  //Setup Lighting
+	  glEnable(GL_LIGHTING);
+	  
+	  const static float[] ambientLight = [0.2f, 0.2f, 0.2f, 1.0f];
+	  const static float[] diffuseLight = [0.8f, 0.8f, 0.8f, 1.0f];
+	  const static float[] positionLight = [0.0f, 0.0f, 1.0f, 0.0f];
+	  
+	  glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight.ptr);
+	  glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight.ptr);
+	  glLightfv(GL_LIGHT0, GL_POSITION, positionLight.ptr);
+	  
+	  glEnable(GL_LIGHT0);
+	  
+	  glColorMaterial ( GL_FRONT, GL_DIFFUSE);
+	  glEnable (GL_COLOR_MATERIAL);
+	  
 	  renderFighters();
 	  //mProgram.use();
 	  // ManBody.useShaderProgram();

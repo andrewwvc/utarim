@@ -489,7 +489,7 @@ struct Gamestate
 	
 }
 
-
+greal arenaHalfwidth = 500.0;
 
 Fighter P1;
 Fighter P2;
@@ -772,6 +772,25 @@ abstract class State
 		{return pos.z = V;}
 		vreal z() const 
 		{return pos.z;}
+	}
+	
+	static Vec3 movePosition(ref Fighter parent, greal nx, greal ny)
+	{	
+		greal x, y;
+		
+		if (nx + parent.halfWidth > arenaHalfwidth)
+			x = arenaHalfwidth - parent.halfWidth;
+		else if (nx - parent.halfWidth < -arenaHalfwidth)
+			x = -arenaHalfwidth + parent.halfWidth;
+		else
+			x = nx;
+			
+		if (ny < 0)
+			y = 0;
+		else
+			y = ny;
+			
+		return Vec3(x,y,0);
 	}
 	
 	void animateState(Fighter parent) @nogc

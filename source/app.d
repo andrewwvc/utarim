@@ -489,7 +489,7 @@ struct Gamestate
 	
 }
 
-greal arenaHalfwidth = 500.0;
+greal arenaHalfwidth = 10.0;
 
 Fighter P1;
 Fighter P2;
@@ -501,8 +501,8 @@ void setupGame() @nogc
 {
   //P1 = make!Fighter(makeState!Idle(-5.0, 0.0), fighterSkeleton);
   //P2 = make!Fighter(makeState!Idle(5.0, 0.0), fighterSkeleton);
-  P1 = emplace!Fighter(FighterData[0..FighterSize], makeState!Idle(-5.0, 0.0), fighterSkeleton);
-  P2 = emplace!Fighter(FighterData[FighterSize..$], makeState!Idle(5.0, 0.0), fighterSkeleton);
+  P1 = emplace!Fighter(FighterData[0..FighterSize], makeState!Idle(-5.0, 0.0, HorizontalDir.right), fighterSkeleton);
+  P2 = emplace!Fighter(FighterData[FighterSize..$], makeState!Idle(5.0, 0.0, HorizontalDir.left), fighterSkeleton);
   Players[0] = P1;
   Players[1] = P2;
 }
@@ -530,11 +530,13 @@ void gameUpdate() @nogc
   P2.swapUpdate();
 }
 
+enum VerticalDir {neutral = 0, up = 1, down = -1};
+enum HorizontalDir {neutral = 0, left = -1, right = 1};
+
 struct ControlInput
 {
-  enum VerticalDir {neutral = 0, up = 1, down = -1};
+  
   VerticalDir vertDir;
-  enum HorizontalDir {neutral = 0, left = -1, right = 1};
   HorizontalDir horiDir;
   
   bool[4] buttons;
@@ -662,7 +664,7 @@ class Fighter
 		{
 			glPushMatrix();
 				glTranslatef(cast(float)x, cast(float)y, 0.0f);
-				glRotatef(90.0, 0.0, 1.0, 0.0);
+				glRotatef(90.0*state.facing, 0.0, 1.0, 0.0);
 				drawFighter(state);
 			glPopMatrix();
 		}
@@ -680,7 +682,7 @@ class Fighter
   protected State state;
   protected State tempState;
   public Skeleton skel;
-  public greal halfWidth = 50.0;
+  public greal halfWidth = 1.0;
   alias state this;
   
 }
@@ -709,7 +711,7 @@ pure size_t mimStateSizeCalc()
 	foreach (sym;  StateList)
 	{
 		size_t cSize = __traits(classInstanceSize, sym);
-		if (cSize > minimum)
+		if (cSize < minimum)
 			minimum = cSize;
 	}
 	
@@ -747,13 +749,14 @@ void breakState(State state)
 
 abstract class State
 {
-  this(greal X, greal Y) @nogc
-  {x = X; y = Y;}
+  this(greal X, greal Y, HorizontalDir faceDirection) @nogc
+  {x = X; y = Y; facing = faceDirection;}
   
   //~this() @nogc;
   
   //public greal x, y;
   public Vec3 pos;
+  public HorizontalDir facing;
   // public alias x = pos.x;
   // public alias y = pos.y;
   
@@ -774,7 +777,7 @@ abstract class State
 		{return pos.z;}
 	}
 	
-	static Vec3 movePosition(ref Fighter parent, greal nx, greal ny)
+	static Vec3 movePosition(ref Fighter parent, greal nx, greal ny) @nogc
 	{	
 		greal x, y;
 		
@@ -806,8 +809,8 @@ abstract class AnimatedState : State
 	Animation* anim;
 	int timeFrame = 0;
 	
-	this(greal x, greal y, int time = 0) @nogc
-	{super(x,y); timeFrame = time;}
+	this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
+	{super(x,y, facing); timeFrame = time;}
 	
 	Animation* getAnim() @nogc
 	{
@@ -829,8 +832,8 @@ class Idle : AnimatedState
 {
 	// int timeFrame = 0;
 	
-  this(greal x, greal y, int time = 0) @nogc
-  {super(x,y,time); anim = &fighterAnimKick;}
+  this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
+  {super(x,y, facing, time); anim = &fighterAnimKick;}
   
   //~this() @nogc {}
   
@@ -838,40 +841,44 @@ class Idle : AnimatedState
   {
     //debug printf("Idle\n");
     if (parent.ci.buttons[0])
-      return makeState!Duck(x,y);
-    else if (parent.ci.horiDir != ControlInput.HorizontalDir.neutral)
-		return makeState!Idle(x+parent.ci.horiDir*0.1 ,y, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+      return makeState!Duck(x,y, facing);
+    else if (parent.ci.horiDir != HorizontalDir.neutral)
+	{
+		//movePosition(parent, x+parent.ci.horiDir*0.1, y);
+	
+		return makeState!Idle(movePosition(parent, x+parent.ci.horiDir*0.1, y).x, y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+	}
 	else
-      return makeState!Idle(x,y, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+      return makeState!Idle(x,y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
   }
 }
 
 class Step : State
 {
-   this(greal x, greal y) @nogc
-  {super(x,y);}
+   this(greal x, greal y, HorizontalDir facing) @nogc
+  {super(x,y, facing);}
 
 	override State makeUpdate(Fighter parent) @nogc
   {
 	x = x + parent.ci.horiDir;
 	y = y + parent.ci.vertDir;
 		
-	return makeState!Step(x,y);
+	return makeState!Step(x,y, facing);
   }
 }
 
 class Duck : AnimatedState
 {
-  this(greal x, greal y, int time = 0) @nogc
-  {super(x,y,time); anim = &fighterAnimSquat;}
+  this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
+  {super(x,y, facing, time); anim = &fighterAnimSquat;}
   
   override State makeUpdate(Fighter parent) @nogc
   {
     //debug printf("Duck\n");
     if (parent.ci.buttons[1])
-      return makeState!Idle(x,y);
+      return makeState!Idle(x,y, facing);
     else
-      return makeState!Duck(x,y, timeFrame+1);
+      return makeState!Duck(x,y, facing, timeFrame+1);
   }
   
   double[10] weights;

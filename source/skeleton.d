@@ -536,7 +536,160 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 	
 	glDisableClientState(GL_NORMAL_ARRAY);
 	glDisableClientState(GL_VERTEX_ARRAY);
-} 
+}
+
+//fvalue = frame, ivalue = interpolation between anim1 and anim2
+void drawSkeletonMeshInterpolated(ref Skeleton skel, ref Animation anim1, ref Animation anim2, real fvalue1, real fvalue2, real ivalue, bool loop = false) @nogc
+{
+    void drawBone(int index, Quat[] f1, Quat[] g1, Quat[] f2, Quat[] g2, vreal interpolation1, vreal interpolation2, float col) @nogc
+    {
+        glColor3f(0.0, col, 1.0-col);
+        
+        glPushMatrix();
+
+	  with (skel.bones[index])
+	  {
+	      //Generates an interpolation between frames
+	      //Quat inter_Quat = f[index]*(f[index].conj()*g[index]).pow(interpolation);
+	      Quat inter_Quat1 = slerp(f1[index], g1[index], interpolation1);
+		  Quat inter_Quat2 = slerp(f2[index], g2[index], interpolation2);
+		  Quat inter_Quat = slerp(inter_Quat1, inter_Quat2, ivalue);
+	      purifyQuat(inter_Quat);
+
+	      with (inter_Quat)
+	      {
+			  auto ii2 = 2*i*i;
+			  auto jj2 = 2*j*j;
+			  auto kk2 = 2*k*k;
+			  auto ij2 = 2*i*j;
+			  auto wk2 = 2*w*k;
+			  auto ki2 = 2*k*i;
+			  auto wj2 = 2*w*j;
+			  auto jk2 = 2*j*k;
+			  auto wi2 = 2*w*i;
+			  GLMatrix mat =
+			  [1-jj2-kk2, ij2+wk2,  ki2-wj2,  0,//b.vOffset.i,
+			  ij2-wk2,  1-ii2-kk2,  jk2+wi2,  0,//b.vOffset.j,
+			  ki2+wj2,  jk2-wi2,  1-ii2-jj2,  0,//b.vOffset.z,
+			  vOffset.x,  vOffset.y,  vOffset.z,  1];
+
+			  glMultMatrixf(mat.ptr);
+
+			  //glTranslatef(b.vOffset.x, b.vOffset.y, b.vOffset.z);
+			  //glRotatef(b.qRotate.w, b.qRotate.i, b.qRotate.j, b.qRotate.k);
+			  glTranslatef(0.0, fLength*0.5, 0.0);
+			  //glScalef(1.0, fLength, 1.0);
+			  glVertexPointer(3, GL_FLOAT, 0, boneVolume.ptr);
+			  glNormalPointer(GL_FLOAT, 0, cubeNormals.ptr);
+			  glDrawElements(GL_QUADS, cast(uint) indices.length, GL_UNSIGNED_BYTE, cast(const(void)*) indices.ptr);
+			  //glScalef(1.0, 1.0/fLength, 1.0); //This will not work with normal based lighting!
+			  glTranslatef(0.0, fLength*0.5, 0.0);
+	      }
+
+
+	      foreach(int ii; Child)
+	      {
+			  if (ii != 0)
+			  {
+				drawBone(ii, f1, g1, f2, g2, interpolation1, interpolation2, col*0.8);
+			  }
+	      }
+	  }
+	  
+        glPopMatrix();
+    }
+    
+
+    glMatrixMode(GL_MODELVIEW);
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_NORMAL_ARRAY);
+	
+        glVertexPointer(3, GL_FLOAT, 0, cubeVerts.ptr);
+
+        //glIndexPointer();
+
+        glColor3f (0.0, 1.0, 0);
+        
+        
+		  int maxFrame1 = anim1.frameNos[$-1];
+		  int minFrame1 = anim1.frameNos[0];
+		  int maxFrame2 = anim2.frameNos[$-1];
+		  int minFrame2 = anim2.frameNos[0];
+		  //printf("len: %i\n", maxFrame);
+		  
+		  
+		  //Correct this code amd get rid of the extra else statement.
+		  if (true)
+		  {
+			real frame1;
+			real frame2;
+			real interp1 = modf(fvalue1, frame1);
+			real interp2 = modf(fvalue2, frame2);
+			foreach(int ii, Bone b; skel.bones)
+			{
+			  if (b.Parent == -1)
+			  {
+				if (loop)
+				{
+					uint iframe1 = cast(uint)(frame1);
+					uint iframe2 = cast(uint)(frame2);
+					drawBone(ii, anim1.frames[iframe1%$], anim1.frames[(iframe1+1)%$], anim2.frames[iframe2%$], anim2.frames[(iframe2+1)%$], interp1, interp2, 1.0);
+				}
+				else
+				{
+					drawBone(ii, anim1.frames[cast(uint)(fmin(frame1, $-1))], anim1.frames[cast(uint)(fmin(frame1+1, $-1))], anim2.frames[cast(uint)(fmin(frame2, $-1))], anim2.frames[cast(uint)(fmin(frame2+1, $-1))], interp1, interp2, 1.0);
+				}
+			  }
+			}
+		  }
+		  else
+		  {
+			// //Find frames
+			// int fseed1 = 0;
+			
+			// vreal internalVal1 = (fvalue1 % (maxFrame1-minFrame1)) + minFrame1;
+			// if (internalVal1 >= maxFrame1)
+			  // internalVal1 = minFrame1;
+			
+			// vreal internalVal2 = (fvalue1 % (maxFrame2-minFrame2)) + minFrame2;
+			// if (internalVal2 >= maxFrame2)
+			  // internalVal2 = minFrame2;
+			
+			// //printf("intVal: %f\n", internalVal);
+			// while (!(anim1.frameNos[fseed1] <= internalVal1 && internalVal1 < anim1.frameNos[fseed1+1]))
+			  // {++fseed1;}
+			  
+			// while (!(anim2.frameNos[fseed2] <= internalVal2 && internalVal2 < anim2.frameNos[fseed2+1]))
+			  // {++fseed2;}
+			  
+			// internalVal1 = (internalVal1 - anim1.frameNos[fseed1]) / (anim1.frameNos[fseed1+1]-anim1.frameNos[fseed1]);
+			// internalVal2 = (internalVal2 - anim2.frameNos[fseed2]) / (anim2.frameNos[fseed2+1]-anim2.frameNos[fseed2]);
+			
+			// Vec3 posA1 = anim1.framePos[fseed1].mult(1.0-internalVal1);
+			// Vec3 posB1 = anim1.framePos[fseed1+1].mult(internalVal1);
+			// Vec3 pos1 = posA1+posB1;
+			// Vec3 posA2 = anim2.framePos[fseed2].mult(1.0-internalVal2);
+			// Vec3 posB2 = anim2.framePos[fseed2+1].mult(internalVal2);
+			// Vec3 pos2 = posA2+posB2;
+			
+			// Vec3 pos = (pos1+pos2)*0.5;
+			
+			// glTranslatef(pos.x, pos.y, pos.z);
+			  
+			  // foreach(int ii, Bone b; skel.bones)
+			  // {
+				// if (b.Parent == -1)
+				// {
+					// drawBone(ii, anim1.frames[fseed1], anim1.frames1[fseed1+1], anim2.frames[fseed2], anim2.frames[fseed2], internalVal, 1.0);
+				// }
+			  // }
+			// glTranslatef(-pos.x, -pos.y, -pos.z);
+		  }
+	
+	glDisableClientState(GL_NORMAL_ARRAY);
+	glDisableClientState(GL_VERTEX_ARRAY);
+}
 
 
 bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GLMatrix posMat, ref Sphere3[] balls) @nogc

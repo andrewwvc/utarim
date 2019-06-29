@@ -518,16 +518,16 @@ void renderFighters() @nogc
 
 void collisions(Fighter first, Fighter second) @nogc
 {
-  
 }
 
 void gameUpdate() @nogc
 {
+  //Perform state copying before this point in order to preserve a set of frame snapshots
   P1.createUpdate();
   P2.createUpdate();
-  collisions(P1, P2);
   P1.swapUpdate();
   P2.swapUpdate();
+  collisions(P1, P2); //Creates new update set to swap
 }
 
 enum VerticalDir {neutral = 0, up = 1, down = -1};
@@ -723,6 +723,8 @@ const size_t maxStateSize = mimStateSizeCalc(); //__traits(classInstanceSize, Du
 FreeList!(Mallocator, minStateSize, maxStateSize) stateFreeList;
 
 
+//IMPORTANT: States should only consist of members that can be coppied over and are independent of the actual frame. i.e. Variables that can be coppied by value or references to things that will never change.
+
 
 @nogc
 auto makeState(T, Args...)(auto ref Args args) if (is(T : State))
@@ -751,6 +753,12 @@ abstract class State
 {
   this(greal X, greal Y, HorizontalDir faceDirection) @nogc
   {x = X; y = Y; facing = faceDirection;}
+  
+  
+  
+  //Construct bools
+  bool attackState = false;
+  bool defenceState = false;
   
   //~this() @nogc;
   
@@ -807,10 +815,14 @@ abstract class State
 abstract class AnimatedState : State
 {
 	Animation* anim;
-	int timeFrame = 0;
+	Animation* toBlendAnim = null;
 	
-	this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
-	{super(x,y, facing); timeFrame = time;}
+	int timeFrame = 0;
+	int timeFrame2 = 0;
+	int ivalue;
+	
+	this(greal x, greal y, HorizontalDir facing, int time = 0, int time2 = 0, int interpolationValue = 0) @nogc
+	{super(x,y, facing); timeFrame = time; timeFrame2 = time2; ivalue = interpolationValue;}
 	
 	Animation* getAnim() @nogc
 	{
@@ -824,7 +836,10 @@ abstract class AnimatedState : State
 	
 	override void animateState(Fighter parent) @nogc
 	{
-		drawSkeletonMesh(parent.skel, *getAnim(), timeFrame, true);
+		if (toBlendAnim == null)
+			drawSkeletonMesh(parent.skel, *getAnim(), timeFrame, true);
+		else
+			drawSkeletonMeshInterpolated(parent.skel, *getAnim(), *toBlendAnim, timeFrame, timeFrame2, ivalue, true);
 	}
 }
 

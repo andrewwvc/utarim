@@ -467,7 +467,7 @@ void realtime() @nogc
 	  //Slows down framerate if time passes too quickly
 	  //Thread.sleep(dur!("nsecs")(nanoFrameDuration - dt.nsecs));
 	  
-	  //This is a basic loop that waits and holds the CPU until the time is ready for a new frame, ideally this shoudl be changes to a sleep() function
+	  //This is a basic loop that waits and holds the CPU until the time is ready for a new frame, ideally this should be changed to a sleep() function
 	  while (dt.nsecs < nanoFrameDuration)
 	  {
 		
@@ -688,7 +688,7 @@ class Fighter
 }
 
 
-alias StateList = AliasSeq!(Idle, Step, Duck);
+alias StateList = AliasSeq!(Idle, Step, Duck, Kick);
 
 pure size_t maxStateSizeCalc()
 {
@@ -757,7 +757,9 @@ abstract class State
   
   
   //Construct bools
+  bool animatedState = false;
   bool attackState = false;
+  //Use the .offset property in order to store the pointer offset for each individual State and cast this to the AttackSubstate
   bool defenceState = false;
   
   //~this() @nogc;
@@ -843,6 +845,25 @@ abstract class AnimatedState : State
 	}
 }
 
+
+struct AttackSubstate
+{
+	struct AttackBox
+	{
+		greal x, y, length, height;
+		bool active = false;
+	}
+	
+	AttackBox[10] attacks;
+}
+
+mixin template AttackMix()
+{
+	AttackSubstate attacks;
+	
+	 bool attackState = true;
+}
+
 class Idle : AnimatedState
 {
 	// int timeFrame = 0;
@@ -897,4 +918,31 @@ class Duck : AnimatedState
   }
   
   double[10] weights;
+}
+
+class Kick : AnimatedState
+{
+	// int timeFrame = 0;
+	
+  this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
+  {super(x,y, facing, time); anim = &fighterAnimKick;}
+  
+  //~this() @nogc {}
+  
+  override State makeUpdate(Fighter parent) @nogc
+  {
+    //debug printf("Idle\n");
+    if (parent.ci.buttons[0])
+      return makeState!Duck(x,y, facing);
+    else if (parent.ci.horiDir != HorizontalDir.neutral)
+	{
+		//movePosition(parent, x+parent.ci.horiDir*0.1, y);
+	
+		return makeState!Idle(movePosition(parent, x+parent.ci.horiDir*0.1, y).x, y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+	}
+	else
+      return makeState!Idle(x,y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+  }
+  
+  mixin AttackMix;
 }

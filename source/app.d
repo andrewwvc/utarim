@@ -2,13 +2,12 @@ import std.stdio;
 import core.memory;
 import derelict.sdl2.sdl;
 import derelict.opengl3.gl;
-//import m3.m3;
+
 import vmath;
 import skeleton;
 import manbody;
 import core.time;
-import core.thread;
-import collisiondet;
+
 
 import allocator.building_blocks.free_list;
 import allocator.mallocator;
@@ -20,6 +19,9 @@ import std.meta;
 const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 1024;
 
+//Ideal frame timing
+const long FRAME_RATE = 60;
+
 SDL_Window* gWindow;
 
 //OpenGL context
@@ -27,6 +29,11 @@ SDL_GLContext gContext;
 
 //Render flag
 bool gRenderQuad = false;
+int syncType; //0 = No Sync, 1 = Vsync, -1 = Adaptive Sync
+
+const int NOSYNC = 0;
+const int VSYNC = 1;
+const int ASYNC = -1;
 
 //Graphics program
 GLuint gProgramID = 0;
@@ -207,9 +214,19 @@ void main()
 	  
 	DerelictGL.reload();
 	
-	//Use Vsync
-	//if( SDL_GL_SetSwapInterval( 1 ) < 0 )
-	 // { printf( "Warning: Unable to set VSync! SDL Error: %s\n", SDL_GetError() ); }
+	syncType = ASYNC;
+	//Use AdaptiveSync, else use Vsync
+	if (SDL_GL_SetSwapInterval( ASYNC ) < 0 )
+	{
+		syncType = VSYNC;
+		printf( "Warning: Unable to set AdaptiveSync! Attempting to set Vsync. SDL Error: %s\n", SDL_GetError() );
+	
+		if( SDL_GL_SetSwapInterval( VSYNC ) < 0 )
+		{
+			syncType = NOSYNC;
+			printf( "Warning: Unable to set VSync! Using no screen sync. SDL Error: %s\n", SDL_GetError() );
+		}
+	}
 	//Initialize OpenGL
 	//if( !initGL() )
 	//  { printf( "Unable to initialize OpenGL!\n" ); return; }
@@ -319,9 +336,9 @@ void realtime() @nogc
 {
 	//The images
        
-        SDL_Surface* screenSurface;
-        SDL_Surface* helloWorld;
-        SDL_Renderer* gRenderer;
+        //SDL_Surface* screenSurface;
+        //SDL_Surface* helloWorld;
+        //SDL_Renderer* gRenderer;
 	//Main loop flag
 	bool quit = false;
 	//Event handler
@@ -337,11 +354,18 @@ void realtime() @nogc
 	  
 	setupGame();
 	
+	
+	if (syncType == VSYNC)
+	{
+		SDL_GL_SwapWindow( gWindow );
+	}
+	
 	TickDuration lastTime = TickDuration.currSystemTick();
 	TickDuration firstTime = lastTime;
 	TickDuration newTime;
 	TickDuration dt;
-	long nanoFrameDuration = 1000000000/60;
+	
+	const long nanoFrameDuration = 1000000000/FRAME_RATE;
 	printf("microFrameDuration: %i \n", nanoFrameDuration);
       
 	//While application is running
@@ -466,6 +490,11 @@ void realtime() @nogc
 	  
 	  //Slows down framerate if time passes too quickly
 	  //Thread.sleep(dur!("nsecs")(nanoFrameDuration - dt.nsecs));
+	  version (Windows)
+	  {
+		import core.sys.windows.winbase : Sleep;
+		Sleep(nanoFrameDuration/1000000);
+	  }
 	  
 	  //This is a basic loop that waits and holds the CPU until the time is ready for a new frame, ideally this should be changed to a sleep() function
 	  while (dt.nsecs < nanoFrameDuration)
@@ -478,8 +507,8 @@ void realtime() @nogc
 	  lastTime = newTime;
 	}
 
-        //Prints on safe exit
-        printf("Exit time: %u\n", SDL_GetTicks() - initTime);
+	//Prints on safe exit
+	printf("Exit time: %u\n", SDL_GetTicks() - initTime);
 	printf("Well done.\n");
 }
 
@@ -687,7 +716,7 @@ class Fighter
   
 }
 
-
+//This should list all non-abstract subclasses of State
 alias StateList = AliasSeq!(Idle, Step, Duck, Kick);
 
 pure size_t maxStateSizeCalc()
@@ -704,7 +733,7 @@ pure size_t maxStateSizeCalc()
 	return maximum;
 }
 
-pure size_t mimStateSizeCalc()
+pure size_t minStateSizeCalc()
 {
 	size_t minimum = size_t.max;
 	
@@ -718,17 +747,22 @@ pure size_t mimStateSizeCalc()
 	return minimum;
 }
 
-const size_t minStateSize = maxStateSizeCalc(); //__traits(classInstanceSize, Idle); //SizeOf!(Idle);
-const size_t maxStateSize = mimStateSizeCalc(); //__traits(classInstanceSize, Duck); //SizeOf!(Duck);
+const size_t minStateSize = minStateSizeCalc(); //__traits(classInstanceSize, Idle); //SizeOf!(Idle);
+const size_t maxStateSize = maxStateSizeCalc(); //__traits(classInstanceSize, Duck); //SizeOf!(Duck);
 FreeList!(Mallocator, minStateSize, maxStateSize) stateFreeList;
 
 
-//IMPORTANT: States should only consist of members that can be coppied over and are independent of the actual frame. i.e. Variables that can be coppied by value or references to things that will never change.
+//IMPORTANT: States should only consist of members that can be copied over and are independent of the actual frame. i.e. Variables that can be copied by value or references to things that will never change.
 
 
 @nogc
 auto makeState(T, Args...)(auto ref Args args) if (is(T : State))
 {
+	import std.algorithm.iteration;
+	//Makes sure that the each State subclass is added to the state list. Otherwise memory corruption could occur.
+	static if (!__traits(isAbstractClass, T))
+		static assert(staticIndexOf!(T, StateList) != -1);//-1 is returned by staticIndexOf if the element is not in the list
+
   //enum size_t SIZE = SizeOf!(T);
   auto mem = stateFreeList.allocate(__traits(classInstanceSize, T));
   
@@ -737,6 +771,7 @@ auto makeState(T, Args...)(auto ref Args args) if (is(T : State))
 
 //(state.classinfo.init.length)
 
+//Destroys a state created by either makeState or deserializeState
 @nogc
 void breakState(State state)
 {
@@ -749,12 +784,87 @@ void breakState(State state)
   }
 }
 
+//dynamicType = staticIndexOf!(typeof(this), StateList);
+
+size_t serializationHeaderSize(T)()
+{
+	//Must return the sizeof the information added by the Identity mixin
+	return size_t.sizeof;
+}
+
+size_t serializationSize(T)()
+{
+	return __traits(getPointerBitmap, T)[0] + serializationHeaderSize!(T)();
+}
+
+void serialize(T)(ref T instance, ubyte[] output)
+{	
+	size_t offset = serializationHeaderSize!(T)();
+	
+	foreach (ref field; instance.tupleof)
+	{
+		typeof(field)[] me = cast(typeof(field)[])output[offset..offset+field.sizeof];
+		me[0] = field;
+		version(BigEndian)
+		{
+			reverse(output[offset..offset+field.sizeof]);
+		}
+		offset += field.sizeof;
+	}
+}
+
+void deserialize(T)(ref T instance, ubyte[] input)
+{	
+	size_t offset = serializationHeaderSize!(T)();
+	
+	foreach (ref field; instance.tupleof)
+	{
+		typeof(field)[] me = cast(typeof(field)[])input[offset..offset+field.sizeof];
+		version(BigEndian)
+		{
+			reverse(input[offset..offset+field.sizeof]);
+		}
+		field = me[0];
+		offset += field.sizeof;
+	}
+}
+
+void deserializeState(ubyte[] input)
+{
+	size_t[] hdr = (cast(size_t[])(input[0..size_t.sizeof]));
+	
+	switch (hdr[0])
+	{
+		foreach(ii, TT; StateList)
+		{
+			case ii:
+			auto stt = makeState!(TT)();
+			deserialize!(TT)(stt, input[size_t.sizeof..size_t.sizeof+serializationSize!(TT)()]);
+			break;
+		}
+	
+		// case 0:
+		// auto stt =  makeState!Idle();
+		// deserialize!Idle(stt, input[size_t.sizeof..size_t.sizeof+serializationSize!(Idle)()]);
+		// break;
+		
+		// case 1:
+		// auto stt =  makeState!Step();
+		// deserialize!Step(stt, input[size_t.sizeof..size_t.sizeof+serializationSize!(Step)()]);
+		// break;
+		
+		default:
+		break;
+	}
+}
+
 abstract class State
 {
+  this() @nogc
+  {}
+
   this(greal X, greal Y, HorizontalDir faceDirection) @nogc
   {x = X; y = Y; facing = faceDirection;}
-  
-  
   
   //Construct bools
   bool animatedState = false;
@@ -810,8 +920,10 @@ abstract class State
 	{
 		drawSkeletonMesh(parent.skel, fighterAnimSquat, 1, true);
 	}
+	
+	void serializeState(this T)(ubyte[] buffer) @nogc;
   
-  State makeUpdate(Fighter parent) @nogc;
+    State makeUpdate(Fighter parent) @nogc;
 }
 
 abstract class AnimatedState : State
@@ -822,6 +934,9 @@ abstract class AnimatedState : State
 	int timeFrame = 0;
 	int timeFrame2 = 0;
 	int ivalue;
+	
+	this() @nogc
+	{}
 	
 	this(greal x, greal y, HorizontalDir facing, int time = 0, int time2 = 0, int interpolationValue = 0) @nogc
 	{super(x,y, facing); timeFrame = time; timeFrame2 = time2; ivalue = interpolationValue;}
@@ -864,10 +979,20 @@ mixin template AttackMix()
 	 bool attackState = true;
 }
 
+mixin template serializableState()
+{
+  override void serializeState(this T)(ubyte[] buffer)
+  {
+	serialize!(T)(this, buffer);
+  }
+}
+
 class Idle : AnimatedState
 {
 	// int timeFrame = 0;
-	
+  this() @nogc
+  {}
+  
   this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
   {super(x,y, facing, time); anim = &fighterAnimKick;}
   
@@ -875,22 +1000,30 @@ class Idle : AnimatedState
   
   override State makeUpdate(Fighter parent) @nogc
   {
-    //debug printf("Idle\n");
-    if (parent.ci.buttons[0])
-      return makeState!Duck(x,y, facing);
-    else if (parent.ci.horiDir != HorizontalDir.neutral)
+	with (parent.ci)
 	{
-		//movePosition(parent, x+parent.ci.horiDir*0.1, y);
-	
-		return makeState!Idle(movePosition(parent, x+parent.ci.horiDir*0.1, y).x, y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+		//debug printf("Idle\n");
+		if (buttons[0])
+		  return makeState!Duck(x,y, facing);
+		else if (horiDir != HorizontalDir.neutral)
+		{
+			//movePosition(parent, x+parent.ci.horiDir*0.1, y);
+		
+			return makeState!Idle(movePosition(parent, x+horiDir*(VerticalDir.down == vertDir ? 0.04 : 0.1), y).x, y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+		}
+		else
+		  return makeState!Idle(x,y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
 	}
-	else
-      return makeState!Idle(x,y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
   }
+  
+  mixin serializableState;
 }
 
 class Step : State
 {
+	this() @nogc
+	{}
+	
    this(greal x, greal y, HorizontalDir facing) @nogc
   {super(x,y, facing);}
 
@@ -901,10 +1034,15 @@ class Step : State
 		
 	return makeState!Step(x,y, facing);
   }
+  
+  mixin serializableState;
 }
 
 class Duck : AnimatedState
 {
+  this() @nogc
+  {}
+  
   this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
   {super(x,y, facing, time); anim = &fighterAnimSquat;}
   
@@ -917,12 +1055,16 @@ class Duck : AnimatedState
       return makeState!Duck(x,y, facing, timeFrame+1);
   }
   
+  mixin serializableState;
+  
   double[10] weights;
 }
 
 class Kick : AnimatedState
 {
 	// int timeFrame = 0;
+  this() @nogc
+  {}
 	
   this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
   {super(x,y, facing, time); anim = &fighterAnimKick;}
@@ -945,4 +1087,5 @@ class Kick : AnimatedState
   }
   
   mixin AttackMix;
+  mixin serializableState;
 }

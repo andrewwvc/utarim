@@ -176,8 +176,13 @@ void removeControler(int id) @nogc
 Skeleton fighterSkeleton;
 Animation fighterAnimKick, fighterAnimSquat;
 
+Skeleton[1] skeletons;
+Animation[4] Animations;
+
 	void loadFighterSkeleton()
 	{
+		
+		
 		fighterSkeleton = makeSkeletonFile("./blend/skelcap.txt");
 		fighterAnimKick = makeAnimationFile(fighterSkeleton, "./blend/LayKick.txt");
 		fighterAnimSquat = makeAnimationFile(fighterSkeleton, "./blend/Squat.txt");
@@ -320,6 +325,21 @@ void main()
 	writeln("Q2: ", inter_Quat1.toString());
 	inter_Quat1 = qt1*(qt1.conj()*qt1).pow(1.0);
 	writeln("Q3: ", inter_Quat1.toString());
+	
+	ubyte[Animation.sizeof+size_t.sizeof] testAnimBuff;
+	serialize!(Animation)(fighterAnimKick, testAnimBuff);
+	writeln("TestAnimation Serialization:\n", testAnimBuff);
+	
+	alias TestType = Duck;
+	
+	TestType testState = makeState!TestType(2,5, HorizontalDir.right);
+	ubyte[maxStateSerializationSize] testBuff;
+	serialize!(TestType)(testState, testBuff);
+	writeln("TestState Serialization:\n", testBuff);
+	State testPolyState = testState;
+	testPolyState.serializeState(testBuff);
+	writeln("TestPolyState Serialization:\n", testBuff);
+	State deState = deserializeState(testBuff);
 	
       
         //Collects all garbage and suspends the GC
@@ -506,6 +526,7 @@ void realtime() @nogc
 	  
 	  lastTime = newTime;
 	}
+	
 
 	//Prints on safe exit
 	printf("Exit time: %u\n", SDL_GetTicks() - initTime);
@@ -785,20 +806,27 @@ void breakState(State state)
 }
 
 //dynamicType = staticIndexOf!(typeof(this), StateList);
-
+@nogc
 size_t serializationHeaderSize(T)()
 {
 	//Must return the sizeof the information added by the Identity mixin
 	return size_t.sizeof;
 }
 
+const size_t maxStateSerializationSize = maxStateSize+size_t.sizeof;
+
+@nogc
 size_t serializationSize(T)()
 {
 	return __traits(getPointerBitmap, T)[0] + serializationHeaderSize!(T)();
 }
 
+@nogc
 void serialize(T)(ref T instance, ubyte[] output)
 {	
+	size_t[] head = cast(size_t[])output[0..size_t.sizeof];
+	head[0] = staticIndexOf!(T, StateList);
+	
 	size_t offset = serializationHeaderSize!(T)();
 	
 	foreach (ref field; instance.tupleof)
@@ -813,6 +841,7 @@ void serialize(T)(ref T instance, ubyte[] output)
 	}
 }
 
+@nogc
 void deserialize(T)(ref T instance, ubyte[] input)
 {	
 	size_t offset = serializationHeaderSize!(T)();
@@ -829,7 +858,8 @@ void deserialize(T)(ref T instance, ubyte[] input)
 	}
 }
 
-void deserializeState(ubyte[] input)
+@nogc
+State deserializeState(ubyte[] input)
 {
 	size_t[] hdr = (cast(size_t[])(input[0..size_t.sizeof]));
 	
@@ -840,21 +870,11 @@ void deserializeState(ubyte[] input)
 			case ii:
 			auto stt = makeState!(TT)();
 			deserialize!(TT)(stt, input[size_t.sizeof..size_t.sizeof+serializationSize!(TT)()]);
-			break;
+			return stt;
 		}
-	
-		// case 0:
-		// auto stt =  makeState!Idle();
-		// deserialize!Idle(stt, input[size_t.sizeof..size_t.sizeof+serializationSize!(Idle)()]);
-		// break;
-		
-		// case 1:
-		// auto stt =  makeState!Step();
-		// deserialize!Step(stt, input[size_t.sizeof..size_t.sizeof+serializationSize!(Step)()]);
-		// break;
 		
 		default:
-		break;
+		return null;
 	}
 }
 
@@ -921,7 +941,7 @@ abstract class State
 		drawSkeletonMesh(parent.skel, fighterAnimSquat, 1, true);
 	}
 	
-	void serializeState(this T)(ubyte[] buffer) @nogc;
+	void serializeState(ubyte[] buffer) @nogc;
   
     State makeUpdate(Fighter parent) @nogc;
 }
@@ -979,9 +999,9 @@ mixin template AttackMix()
 	 bool attackState = true;
 }
 
-mixin template serializableState()
+mixin template serializableState(T)
 {
-  override void serializeState(this T)(ubyte[] buffer)
+  override void serializeState(ubyte[] buffer) @nogc
   {
 	serialize!(T)(this, buffer);
   }
@@ -1016,7 +1036,7 @@ class Idle : AnimatedState
 	}
   }
   
-  mixin serializableState;
+  mixin serializableState!(Idle);
 }
 
 class Step : State
@@ -1035,7 +1055,7 @@ class Step : State
 	return makeState!Step(x,y, facing);
   }
   
-  mixin serializableState;
+  mixin serializableState!(Step);
 }
 
 class Duck : AnimatedState
@@ -1055,7 +1075,7 @@ class Duck : AnimatedState
       return makeState!Duck(x,y, facing, timeFrame+1);
   }
   
-  mixin serializableState;
+  mixin serializableState!(Duck);
   
   double[10] weights;
 }
@@ -1087,5 +1107,5 @@ class Kick : AnimatedState
   }
   
   mixin AttackMix;
-  mixin serializableState;
+  mixin serializableState!(Kick);
 }

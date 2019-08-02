@@ -173,19 +173,29 @@ void removeControler(int id) @nogc
 //Skeleton testSkel;
 //Animation testAnim, otherAnim;
 
-Skeleton fighterSkeleton;
-Animation fighterAnimKick, fighterAnimSquat;
+//General index type
+alias GenIndex = short;
+
+//Specific index types
+alias SkeletonIndex = GenIndex;
+alias AnimationIndex = GenIndex;
+alias StateIndex = GenIndex;
+
+SkeletonIndex fighterSkeleton;
+AnimationIndex fighterAnimKick, fighterAnimSquat;
 
 Skeleton[1] skeletons;
-Animation[4] Animations;
+Animation[4] animations;
 
 	void loadFighterSkeleton()
 	{
+		skeletons[0] = makeSkeletonFile("./blend/skelcap.txt");
+		fighterSkeleton = 0;
 		
-		
-		fighterSkeleton = makeSkeletonFile("./blend/skelcap.txt");
-		fighterAnimKick = makeAnimationFile(fighterSkeleton, "./blend/LayKick.txt");
-		fighterAnimSquat = makeAnimationFile(fighterSkeleton, "./blend/Squat.txt");
+		animations[0] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/LayKick.txt");
+		fighterAnimKick = 0;
+		animations[1] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/Squat.txt");
+		fighterAnimSquat = 1;
 	}
 
 void main()
@@ -256,7 +266,7 @@ void main()
 	//testAnim = makeAnimationFile(testSkel, "./blend/LayKick.txt");
 	//otherAnim = makeAnimationFile(testSkel, "./blend/Squat.txt");
 	//otherAnim = makeAnimationFile(testSkel, "./blend/animcap.txt");
-	writeln("TA: ", fighterAnimKick.frames[0][6].toString());
+	writeln("TA: ", animations[fighterAnimKick].frames[0][6].toString());
 	
 	//int[][2] blah = new int[][](2, 10);
 	//auto ging = blah[];
@@ -264,13 +274,13 @@ void main()
 	
 	GLMatrix identityMat = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 	Sphere3[] testBall = [Sphere3(1.0, Vec3(1.5,1.0,0))];
-	writeln("SkeletonBallTest: " ~ (testSkeletonBall(fighterSkeleton, fighterAnimKick, 1.0, identityMat, testBall)? "T":"F") ~'\n');
+	writeln("SkeletonBallTest: " ~ (testSkeletonBall(skeletons[fighterSkeleton], animations[fighterAnimKick], 1.0, identityMat, testBall)? "T":"F") ~'\n');
 	
 	testBall[] = Sphere3(1.0, Vec3(0,8.5,0));
-	writeln("SkeletonBallTest: " ~ (testSkeletonBall(fighterSkeleton, fighterAnimKick, 1.0, identityMat, testBall)? "T":"F") ~ Vec3(0,8.5,0).stringof ~'\n');
+	writeln("SkeletonBallTest: " ~ (testSkeletonBall(skeletons[fighterSkeleton], animations[fighterAnimKick], 1.0, identityMat, testBall)? "T":"F") ~ Vec3(0,8.5,0).stringof ~'\n');
 	
 	testBall[] = Sphere3(1.0, Vec3(0.5,0.5,0));
-	writeln("SkeletonBallTest: " ~ (testSkeletonBall(fighterSkeleton, fighterAnimKick, 28.0, identityMat, testBall)? "T":"F") ~'\n');
+	writeln("SkeletonBallTest: " ~ (testSkeletonBall(skeletons[fighterSkeleton], animations[fighterAnimKick], 28.0, identityMat, testBall)? "T":"F") ~'\n');
 	
 	Pill3 p = Pill3(1, Vec3(0,0,0), Vec3(10, 0, 0));
 	Sphere3 s = Sphere3(1, Vec3(5, 0, 0));
@@ -327,12 +337,12 @@ void main()
 	writeln("Q3: ", inter_Quat1.toString());
 	
 	ubyte[Animation.sizeof+size_t.sizeof] testAnimBuff;
-	serialize!(Animation)(fighterAnimKick, testAnimBuff);
+	serialize!(Animation)(animations[fighterAnimKick], testAnimBuff);
 	writeln("TestAnimation Serialization:\n", testAnimBuff);
 	
-	alias TestType = Duck;
+	alias TestType = Kick;
 	
-	TestType testState = makeState!TestType(2,5, HorizontalDir.right);
+	TestType testState = makeState!TestType(4.0,5.0, HorizontalDir.right);
 	ubyte[maxStateSerializationSize] testBuff;
 	serialize!(TestType)(testState, testBuff);
 	writeln("TestState Serialization:\n", testBuff);
@@ -551,8 +561,8 @@ void setupGame() @nogc
 {
   //P1 = make!Fighter(makeState!Idle(-5.0, 0.0), fighterSkeleton);
   //P2 = make!Fighter(makeState!Idle(5.0, 0.0), fighterSkeleton);
-  P1 = emplace!Fighter(FighterData[0..FighterSize], makeState!Idle(-5.0, 0.0, HorizontalDir.right), fighterSkeleton);
-  P2 = emplace!Fighter(FighterData[FighterSize..$], makeState!Idle(5.0, 0.0, HorizontalDir.left), fighterSkeleton);
+  P1 = emplace!Fighter(FighterData[0..FighterSize], makeState!Idle(-5.0, 0.0, HorizontalDir.right), skeletons[fighterSkeleton]);
+  P2 = emplace!Fighter(FighterData[FighterSize..$], makeState!Idle(5.0, 0.0, HorizontalDir.left), skeletons[fighterSkeleton]);
   Players[0] = P1;
   Players[1] = P2;
 }
@@ -746,7 +756,7 @@ pure size_t maxStateSizeCalc()
 	
 	foreach (sym;  StateList)
 	{
-		size_t cSize = __traits(classInstanceSize, sym);
+		size_t cSize = __traits(getPointerBitmap, sym)[0]; //__traits(classInstanceSize, sym);
 		if (cSize > maximum)
 			maximum = cSize;
 	}
@@ -760,7 +770,7 @@ pure size_t minStateSizeCalc()
 	
 	foreach (sym;  StateList)
 	{
-		size_t cSize = __traits(classInstanceSize, sym);
+		size_t cSize = __traits(getPointerBitmap, sym)[0]; //__traits(classInstanceSize, sym);
 		if (cSize < minimum)
 			minimum = cSize;
 	}
@@ -810,10 +820,10 @@ void breakState(State state)
 size_t serializationHeaderSize(T)()
 {
 	//Must return the sizeof the information added by the Identity mixin
-	return size_t.sizeof;
+	return StateIndex.sizeof;
 }
 
-const size_t maxStateSerializationSize = maxStateSize+size_t.sizeof;
+const size_t maxStateSerializationSize = maxStateSize+StateIndex.sizeof;
 
 @nogc
 size_t serializationSize(T)()
@@ -824,11 +834,8 @@ size_t serializationSize(T)()
 @nogc
 void serialize(T)(ref T instance, ubyte[] output)
 {	
-	size_t[] head = cast(size_t[])output[0..size_t.sizeof];
-	head[0] = staticIndexOf!(T, StateList);
-	
-	size_t offset = serializationHeaderSize!(T)();
-	
+	size_t offset = 0;
+
 	foreach (ref field; instance.tupleof)
 	{
 		typeof(field)[] me = cast(typeof(field)[])output[offset..offset+field.sizeof];
@@ -839,6 +846,19 @@ void serialize(T)(ref T instance, ubyte[] output)
 		}
 		offset += field.sizeof;
 	}
+}
+
+@nogc
+void serializeSupers(T)(ref T instance, ubyte[] output)
+{	
+	alias baseClasses = Erase!(Object, BaseClassesTuple!(T));
+
+	StateIndex[] head = cast(StateIndex[])output[0..StateIndex.sizeof];
+	head[0] = staticIndexOf!(T, StateList);
+	
+	size_t offset = serializationHeaderSize!(T)();
+	
+	serialize!(T)(instance, output[offset..serializationSize!(T)()]);
 }
 
 @nogc
@@ -861,7 +881,7 @@ void deserialize(T)(ref T instance, ubyte[] input)
 @nogc
 State deserializeState(ubyte[] input)
 {
-	size_t[] hdr = (cast(size_t[])(input[0..size_t.sizeof]));
+	StateIndex[] hdr = (cast(StateIndex[])(input[0..StateIndex.sizeof]));
 	
 	switch (hdr[0])
 	{
@@ -869,7 +889,7 @@ State deserializeState(ubyte[] input)
 		{
 			case ii:
 			auto stt = makeState!(TT)();
-			deserialize!(TT)(stt, input[size_t.sizeof..size_t.sizeof+serializationSize!(TT)()]);
+			deserialize!(TT)(stt, input[serializationHeaderSize!(TT)()..serializationSize!(TT)()]);
 			return stt;
 		}
 		
@@ -938,7 +958,7 @@ abstract class State
 	
 	void animateState(Fighter parent) @nogc
 	{
-		drawSkeletonMesh(parent.skel, fighterAnimSquat, 1, true);
+		drawSkeletonMesh(parent.skel, animations[fighterAnimSquat], 1, true);
 	}
 	
 	void serializeState(ubyte[] buffer) @nogc;
@@ -948,7 +968,7 @@ abstract class State
 
 abstract class AnimatedState : State
 {
-	Animation* anim;
+	AnimationIndex anim;
 	Animation* toBlendAnim = null;
 	
 	int timeFrame = 0;
@@ -963,7 +983,7 @@ abstract class AnimatedState : State
 	
 	Animation* getAnim() @nogc
 	{
-		return anim;
+		return &animations[anim];
 	}
 	
 	// void animateState(Fighter f) @nogc
@@ -999,11 +1019,16 @@ mixin template AttackMix()
 	 bool attackState = true;
 }
 
-mixin template serializableState(T)
+mixin template serializableState()
 {
+  auto retThis()
+  {
+	return this;
+  }
+
   override void serializeState(ubyte[] buffer) @nogc
   {
-	serialize!(T)(this, buffer);
+	serializeSupers!(typeof(retThis()))(this, buffer);
   }
 }
 
@@ -1014,7 +1039,7 @@ class Idle : AnimatedState
   {}
   
   this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
-  {super(x,y, facing, time); anim = &fighterAnimKick;}
+  {super(x,y, facing, time); anim = fighterAnimKick;}
   
   //~this() @nogc {}
   
@@ -1029,14 +1054,14 @@ class Idle : AnimatedState
 		{
 			//movePosition(parent, x+parent.ci.horiDir*0.1, y);
 		
-			return makeState!Idle(movePosition(parent, x+horiDir*(VerticalDir.down == vertDir ? 0.04 : 0.1), y).x, y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+			return makeState!Idle(movePosition(parent, x+horiDir*(VerticalDir.down == vertDir ? 0.04 : 0.1), y).x, y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
 		}
 		else
-		  return makeState!Idle(x,y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+		  return makeState!Idle(x,y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
 	}
   }
   
-  mixin serializableState!(Idle);
+  mixin serializableState;
 }
 
 class Step : State
@@ -1055,7 +1080,7 @@ class Step : State
 	return makeState!Step(x,y, facing);
   }
   
-  mixin serializableState!(Step);
+  mixin serializableState;
 }
 
 class Duck : AnimatedState
@@ -1064,7 +1089,7 @@ class Duck : AnimatedState
   {}
   
   this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
-  {super(x,y, facing, time); anim = &fighterAnimSquat;}
+  {super(x,y, facing, time); anim = fighterAnimSquat;}
   
   override State makeUpdate(Fighter parent) @nogc
   {
@@ -1075,9 +1100,9 @@ class Duck : AnimatedState
       return makeState!Duck(x,y, facing, timeFrame+1);
   }
   
-  mixin serializableState!(Duck);
+  mixin serializableState;
   
-  double[10] weights;
+  //double[10] weights;
 }
 
 class Kick : AnimatedState
@@ -1087,7 +1112,7 @@ class Kick : AnimatedState
   {}
 	
   this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
-  {super(x,y, facing, time); anim = &fighterAnimKick;}
+  {super(x,y, facing, time); anim = fighterAnimKick;}
   
   //~this() @nogc {}
   
@@ -1100,12 +1125,13 @@ class Kick : AnimatedState
 	{
 		//movePosition(parent, x+parent.ci.horiDir*0.1, y);
 	
-		return makeState!Idle(movePosition(parent, x+parent.ci.horiDir*0.1, y).x, y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+		return makeState!Idle(movePosition(parent, x+parent.ci.horiDir*0.1, y).x, y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
 	}
 	else
-      return makeState!Idle(x,y, facing, (timeFrame+1 > anim.frameNos.length)? 0: timeFrame+1);
+      return makeState!Idle(x,y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
   }
   
+  bool attackState = true;
   mixin AttackMix;
-  mixin serializableState!(Kick);
+  mixin serializableState;
 }

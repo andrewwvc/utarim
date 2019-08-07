@@ -187,6 +187,23 @@ AnimationIndex fighterAnimKick, fighterAnimSquat;
 Skeleton[1] skeletons;
 Animation[4] animations;
 
+@nogc
+void dynamicPrint(string st)
+{
+	if (st.length < 1080)
+	{
+		char[1080] bufferU;
+		bufferU[0..(st.length)] = cast(char[])(st);
+		bufferU[st.length] = '\0';
+		printf("%s\n", bufferU.ptr);
+	}
+	else
+	{
+		printf("String too long!");
+	}
+}
+
+
 	void loadFighterSkeleton()
 	{
 		skeletons[0] = makeSkeletonFile("./blend/skelcap.txt");
@@ -340,16 +357,26 @@ void main()
 	serialize!(Animation)(animations[fighterAnimKick], testAnimBuff);
 	writeln("TestAnimation Serialization:\n", testAnimBuff);
 	
-	alias TestType = Kick;
+	alias TestType = Duck;
 	
-	TestType testState = makeState!TestType(4.0,5.0, HorizontalDir.right);
-	ubyte[maxStateSerializationSize] testBuff;
-	serialize!(TestType)(testState, testBuff);
+	alias serialClasses = AliasSeq!(TestType, Erase!(Object, BaseClassesTuple!(TestType)));
+	
+	foreach (TT; serialClasses)
+	{
+		char[] bufferU = (fullyQualifiedName!(TT) ~ '\0').dup;
+		printf("%s\n", bufferU.ptr);
+	}
+	
+	TestType testState = makeState!TestType(4.0, 20.0, HorizontalDir.right);
+	ubyte[maxStateSerializationSize] testBuff, secondTestBuff;
+	serializeSupers!(TestType)(testState, testBuff);
 	writeln("TestState Serialization:\n", testBuff);
 	State testPolyState = testState;
 	testPolyState.serializeState(testBuff);
 	writeln("TestPolyState Serialization:\n", testBuff);
 	State deState = deserializeState(testBuff);
+	deState.serializeState(secondTestBuff);
+	writeln("TestState De-serialization:\n", secondTestBuff);
 	
       
         //Collects all garbage and suspends the GC
@@ -832,7 +859,7 @@ size_t serializationSize(T)()
 }
 
 @nogc
-void serialize(T)(ref T instance, ubyte[] output)
+size_t serialize(T)(ref T instance, ubyte[] output)
 {	
 	size_t offset = 0;
 
@@ -846,25 +873,33 @@ void serialize(T)(ref T instance, ubyte[] output)
 		}
 		offset += field.sizeof;
 	}
+	
+	return offset;
 }
 
 @nogc
-void serializeSupers(T)(ref T instance, ubyte[] output)
+void serializeSupers(TT)(ref TT instance, ubyte[] output)
 {	
-	alias baseClasses = Erase!(Object, BaseClassesTuple!(T));
-
 	StateIndex[] head = cast(StateIndex[])output[0..StateIndex.sizeof];
-	head[0] = staticIndexOf!(T, StateList);
+	head[0] = staticIndexOf!(TT, StateList);
 	
-	size_t offset = serializationHeaderSize!(T)();
+	size_t offset = StateIndex.sizeof;
 	
-	serialize!(T)(instance, output[offset..serializationSize!(T)()]);
+	alias serClasses = AliasSeq!(TT, Erase!(Object, BaseClassesTuple!(TT)));
+	
+	foreach(CC; serClasses)
+	{
+		CC tempCC = cast(CC)(instance);
+		offset += serialize!(CC)(tempCC, output[offset..offset+__traits(getPointerBitmap, CC)[0]]);
+	}
+	
+	//serialize!(T)(instance, output[offset..serializationSize!(TT)()]);
 }
 
 @nogc
-void deserialize(T)(ref T instance, ubyte[] input)
+size_t deserialize(T)(ref T instance, ubyte[] input)
 {	
-	size_t offset = serializationHeaderSize!(T)();
+	size_t offset = 0;
 	
 	foreach (ref field; instance.tupleof)
 	{
@@ -875,6 +910,21 @@ void deserialize(T)(ref T instance, ubyte[] input)
 		}
 		field = me[0];
 		offset += field.sizeof;
+	}
+	
+	return offset;
+}
+
+void deserializeSupers(TT)(ref TT instance, ubyte[] input)
+{
+	size_t offset = 0;
+	
+	alias serClasses = AliasSeq!(TT, Erase!(Object, BaseClassesTuple!(TT)));
+
+	foreach (CC; serClasses)
+	{
+		CC tempCC = cast(CC)(instance);
+		offset += deserialize!(CC)(tempCC, input[offset..offset+__traits(getPointerBitmap, CC)[0]]);
 	}
 }
 
@@ -889,7 +939,7 @@ State deserializeState(ubyte[] input)
 		{
 			case ii:
 			auto stt = makeState!(TT)();
-			deserialize!(TT)(stt, input[serializationHeaderSize!(TT)()..serializationSize!(TT)()]);
+			deserializeSupers!(TT)(stt, input[serializationHeaderSize!(TT)()..serializationSize!(TT)()]);
 			return stt;
 		}
 		
@@ -1029,6 +1079,8 @@ mixin template serializableState()
   override void serializeState(ubyte[] buffer) @nogc
   {
 	serializeSupers!(typeof(retThis()))(this, buffer);
+	
+	dynamicPrint(fullyQualifiedName!(typeof(retThis()))); 
   }
 }
 

@@ -1,4 +1,4 @@
-import std.stdio;
+import std.stdio: writeln, printf;
 import core.memory;
 import derelict.sdl2.sdl;
 import derelict.opengl3.gl;
@@ -187,8 +187,8 @@ AnimationIndex fighterAnimKick, fighterAnimSquat;
 Skeleton[1] skeletons;
 Animation[4] animations;
 
-@nogc
-void dynamicPrint(string st)
+debug
+void dynamicPrint(string st) @nogc
 {
 	if (st.length < 1080)
 	{
@@ -204,16 +204,16 @@ void dynamicPrint(string st)
 }
 
 
-	void loadFighterSkeleton()
-	{
-		skeletons[0] = makeSkeletonFile("./blend/skelcap.txt");
-		fighterSkeleton = 0;
-		
-		animations[0] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/LayKick.txt");
-		fighterAnimKick = 0;
-		animations[1] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/Squat.txt");
-		fighterAnimSquat = 1;
-	}
+void loadFighterSkeleton()
+{
+	skeletons[0] = makeSkeletonFile("./blend/skelcap.txt");
+	fighterSkeleton = 0;
+	
+	animations[0] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/LayKick.txt");
+	fighterAnimKick = 0;
+	animations[1] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/Squat.txt");
+	fighterAnimSquat = 1;
+}
 
 void main()
 {
@@ -279,53 +279,56 @@ void main()
 	
 	loadFighterSkeleton();
 	
-	//testSkel = makeSkeletonFile("./blend/skelcap.txt");
-	//testAnim = makeAnimationFile(testSkel, "./blend/LayKick.txt");
-	//otherAnim = makeAnimationFile(testSkel, "./blend/Squat.txt");
-	//otherAnim = makeAnimationFile(testSkel, "./blend/animcap.txt");
-	writeln("TA: ", animations[fighterAnimKick].frames[0][6].toString());
-	
-	//int[][2] blah = new int[][](2, 10);
-	//auto ging = blah[];
-	//writeln(ging[1][4]);
-	
-	GLMatrix identityMat = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
-	Sphere3[] testBall = [Sphere3(1.0, Vec3(1.5,1.0,0))];
-	writeln("SkeletonBallTest: " ~ (testSkeletonBall(skeletons[fighterSkeleton], animations[fighterAnimKick], 1.0, identityMat, testBall)? "T":"F") ~'\n');
-	
-	testBall[] = Sphere3(1.0, Vec3(0,8.5,0));
-	writeln("SkeletonBallTest: " ~ (testSkeletonBall(skeletons[fighterSkeleton], animations[fighterAnimKick], 1.0, identityMat, testBall)? "T":"F") ~ Vec3(0,8.5,0).stringof ~'\n');
-	
-	testBall[] = Sphere3(1.0, Vec3(0.5,0.5,0));
-	writeln("SkeletonBallTest: " ~ (testSkeletonBall(skeletons[fighterSkeleton], animations[fighterAnimKick], 28.0, identityMat, testBall)? "T":"F") ~'\n');
-	
-	Pill3 p = Pill3(1, Vec3(0,0,0), Vec3(10, 0, 0));
-	Sphere3 s = Sphere3(1, Vec3(5, 0, 0));
-	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
-	
-	p = Pill3(1, Vec3(100,0,0), Vec3(110, 0, 0));
-	s = Sphere3(1, Vec3(105, 0, 0));
-	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
-	
-	p = Pill3(1, Vec3(100,0,0), Vec3(110, 0, 0));
-	s = Sphere3(1, Vec3(115, 0, 0));
-	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
-	
-	p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
-	s = Sphere3(1, Vec3(0, 0, 0));
-	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
-	
-	p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
-	s = Sphere3(1, Vec3(0, 1, 0));
-	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
-	
-	p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
-	s = Sphere3(1, Vec3(-1, 1, -1));
-	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
-	
-	p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
-	s = Sphere3(1, Vec3(-2, 0, 0.1));
-	writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+	debug
+	{
+		//testSkel = makeSkeletonFile("./blend/skelcap.txt");
+		//testAnim = makeAnimationFile(testSkel, "./blend/LayKick.txt");
+		//otherAnim = makeAnimationFile(testSkel, "./blend/Squat.txt");
+		//otherAnim = makeAnimationFile(testSkel, "./blend/animcap.txt");
+		writeln("TA: ", animations[fighterAnimKick].frames[0][6].toString());
+		
+		//int[][2] blah = new int[][](2, 10);
+		//auto ging = blah[];
+		//writeln(ging[1][4]);
+		
+		GLMatrix identityMat = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+		Sphere3[] testBall = [Sphere3(1.0, Vec3(1.5,1.0,0))];
+		writeln("SkeletonBallTest: " ~ (testSkeletonBall(skeletons[fighterSkeleton], animations[fighterAnimKick], 1.0, identityMat, testBall)? "T":"F") ~'\n');
+		
+		testBall[] = Sphere3(1.0, Vec3(0,8.5,0));
+		writeln("SkeletonBallTest: " ~ (testSkeletonBall(skeletons[fighterSkeleton], animations[fighterAnimKick], 1.0, identityMat, testBall)? "T":"F") ~ Vec3(0,8.5,0).stringof ~'\n');
+		
+		testBall[] = Sphere3(1.0, Vec3(0.5,0.5,0));
+		writeln("SkeletonBallTest: " ~ (testSkeletonBall(skeletons[fighterSkeleton], animations[fighterAnimKick], 28.0, identityMat, testBall)? "T":"F") ~'\n');
+		
+		Pill3 p = Pill3(1, Vec3(0,0,0), Vec3(10, 0, 0));
+		Sphere3 s = Sphere3(1, Vec3(5, 0, 0));
+		writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+		
+		p = Pill3(1, Vec3(100,0,0), Vec3(110, 0, 0));
+		s = Sphere3(1, Vec3(105, 0, 0));
+		writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+		
+		p = Pill3(1, Vec3(100,0,0), Vec3(110, 0, 0));
+		s = Sphere3(1, Vec3(115, 0, 0));
+		writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+		
+		p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
+		s = Sphere3(1, Vec3(0, 0, 0));
+		writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+		
+		p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
+		s = Sphere3(1, Vec3(0, 1, 0));
+		writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+		
+		p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
+		s = Sphere3(1, Vec3(-1, 1, -1));
+		writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+		
+		p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
+		s = Sphere3(1, Vec3(-2, 0, 0.1));
+		writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+	}
 	
 	//Initialize Projection Matrix
 	glMatrixMode( GL_PROJECTION ); //glLoadIdentity();
@@ -345,38 +348,41 @@ void main()
 	//Initialize clear color
 	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
 	
-	Quat qt1 = rotationQuat(TAU*0.25, 0, 0, 1);
-	Quat inter_Quat1 = qt1*(qt1.conj()*qt1).pow(0.0);
-	writeln("Q1: ", inter_Quat1.toString());
-	inter_Quat1 = qt1*(qt1.conj()*qt1).pow(0.5);
-	writeln("Q2: ", inter_Quat1.toString());
-	inter_Quat1 = qt1*(qt1.conj()*qt1).pow(1.0);
-	writeln("Q3: ", inter_Quat1.toString());
-	
-	ubyte[Animation.sizeof+size_t.sizeof] testAnimBuff;
-	serialize!(Animation)(animations[fighterAnimKick], testAnimBuff);
-	writeln("TestAnimation Serialization:\n", testAnimBuff);
-	
-	alias TestType = Duck;
-	
-	alias serialClasses = AliasSeq!(TestType, Erase!(Object, BaseClassesTuple!(TestType)));
-	
-	foreach (TT; serialClasses)
+	debug
 	{
-		char[] bufferU = (fullyQualifiedName!(TT) ~ '\0').dup;
-		printf("%s\n", bufferU.ptr);
+		Quat qt1 = rotationQuat(TAU*0.25, 0, 0, 1);
+		Quat inter_Quat1 = qt1*(qt1.conj()*qt1).pow(0.0);
+		writeln("Q1: ", inter_Quat1.toString());
+		inter_Quat1 = qt1*(qt1.conj()*qt1).pow(0.5);
+		writeln("Q2: ", inter_Quat1.toString());
+		inter_Quat1 = qt1*(qt1.conj()*qt1).pow(1.0);
+		writeln("Q3: ", inter_Quat1.toString());
+		
+		ubyte[Animation.sizeof+size_t.sizeof] testAnimBuff;
+		serialize!(Animation)(animations[fighterAnimKick], testAnimBuff);
+		writeln("TestAnimation Serialization:\n", testAnimBuff);
+		
+		alias TestType = Duck;
+		
+		alias serialClasses = AliasSeq!(TestType, Erase!(Object, BaseClassesTuple!(TestType)));
+		
+		foreach (TT; serialClasses)
+		{
+			char[] bufferU = (fullyQualifiedName!(TT) ~ '\0').dup;
+			printf("%s\n", bufferU.ptr);
+		}
+		
+		TestType testState = makeState!TestType(4.0, 20.0, HorizontalDir.right);
+		ubyte[maxStateSerializationSize] testBuff, secondTestBuff;
+		serializeSupers!(TestType)(testState, testBuff);
+		writeln("TestState Serialization:\n", testBuff);
+		State testPolyState = testState;
+		testPolyState.serializeState(testBuff);
+		writeln("TestPolyState Serialization:\n", testBuff);
+		State deState = deserializeState(testBuff);
+		deState.serializeState(secondTestBuff);
+		writeln("TestState De-serialization:\n", secondTestBuff);
 	}
-	
-	TestType testState = makeState!TestType(4.0, 20.0, HorizontalDir.right);
-	ubyte[maxStateSerializationSize] testBuff, secondTestBuff;
-	serializeSupers!(TestType)(testState, testBuff);
-	writeln("TestState Serialization:\n", testBuff);
-	State testPolyState = testState;
-	testPolyState.serializeState(testBuff);
-	writeln("TestPolyState Serialization:\n", testBuff);
-	State deState = deserializeState(testBuff);
-	deState.serializeState(secondTestBuff);
-	writeln("TestState De-serialization:\n", secondTestBuff);
 	
       
         //Collects all garbage and suspends the GC
@@ -389,13 +395,9 @@ void main()
 }
 
 
+
 void realtime() @nogc
 {
-	//The images
-       
-        //SDL_Surface* screenSurface;
-        //SDL_Surface* helloWorld;
-        //SDL_Renderer* gRenderer;
 	//Main loop flag
 	bool quit = false;
 	//Event handler
@@ -440,20 +442,39 @@ void realtime() @nogc
 	    {
 	      switch (e.key.keysym.sym)
 	      {
-// 		case SDLK_UP:
-// 		glColor4f(1.0f, 0.8f, 0.0f, 1.0f);
-// 		break;
-		//SDL_FillRect( screenSurface, null, SDL_MapRGB( screenSurface.format, 0xFF, 0xF0, 0x00 ) );
-		
-		case SDLK_ESCAPE:
-		quit = true;
-		break;
-		
-		default:
-		//SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
-		//glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-		//Apply the image
-		//SDL_BlitSurface( helloWorld, null, screenSurface, null);
+	// 		case SDLK_UP:
+	// 		glColor4f(1.0f, 0.8f, 0.0f, 1.0f);
+	// 		break;
+			//SDL_FillRect( screenSurface, null, SDL_MapRGB( screenSurface.format, 0xFF, 0xF0, 0x00 ) );
+			
+			case SDLK_ESCAPE:
+			quit = true;
+			break;
+			
+			debug
+			{
+				case SDLK_q:
+				saveState();
+				break;
+				
+				case SDLK_a:
+				restoreState();
+				break;
+				
+				case SDLK_w:
+				writeSave();
+				break;
+				
+				case SDLK_s:
+				readSave();
+				break;
+			}
+			
+			default:
+			//SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
+			//glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+			//Apply the image
+			//SDL_BlitSurface( helloWorld, null, screenSurface, null);
 	      }
 	    }
 		else if (e.type == SDL_JOYDEVICEREMOVED)
@@ -513,36 +534,12 @@ void realtime() @nogc
 	  glEnable (GL_COLOR_MATERIAL);
 	  
 	  renderFighters();
-	  //mProgram.use();
-	  // ManBody.useShaderProgram();
-	  // glPushMatrix();
-	    // glTranslatef(0.0,0.0,-15.0);
-	    // man1.update(dt.length / cast(double)TickDuration.ticksPerSec);
-	    // man1.render();
-	    // man2.update(0.03);
-	    // glTranslatef(5.0f, 1.0f, -2.0f);
-	    // man2.render();
-	    // glTranslatef(-5.0f, -1.0f, 2.0f);
-	    // glUseProgram(0);
-	    // glPushMatrix();
-	      // glTranslatef(0.0, 0.0, 8.0);
-	      // double tickVal = (lastTime.length-firstTime.length)*(10.0/cast(double)TickDuration.ticksPerSec);
-	      // glRotatef(tickVal, 0.0f, 1.0f, 0.0f);
-	      // if (P1.ci.buttons[0])
-		// drawSkeletonMesh(fighterSkeleton, fighterAnimKick, tickVal, true);
-	      // else
-		// drawSkeletonMesh(fighterSkeleton, fighterAnimSquat, tickVal, true);
-	      // //printf("TV: %f\n", tickVal);
-	    // glPopMatrix();
-	    
-	  // glPopMatrix();
 	  
 	  SDL_GL_SwapWindow( gWindow );
 	  
 	  //Time update
 	  newTime = TickDuration.currSystemTick();
 	  dt = newTime - lastTime;
-	  //printf("dt: %i \n", dt.usecs);
 	  
 	  
 	  //Slows down framerate if time passes too quickly
@@ -584,6 +581,97 @@ Fighter[2] Players;
 const size_t FighterSize = __traits(classInstanceSize, Fighter);
 void[FighterSize*2] FighterData;
 
+debug
+@nogc
+{
+	import core.stdc.stdio;
+
+	ubyte[maxStateSerializationSize][2] serial;//For serialization testing
+	
+	void saveState()
+	{
+		P1.state.serializeState(serial[0]);
+		P2.state.serializeState(serial[1]);
+		
+		printf("State stored!\n");
+	}
+	
+	void restoreState()
+	{
+		State storedState1 = deserializeState(serial[0]);
+		State storedState2 = deserializeState(serial[1]);
+		P1.restoreState(storedState1);
+		P2.restoreState(storedState2);
+		
+		printf("State REstored!\n");
+	}
+	
+	void writeState(FILE* fp, in ubyte[] stateBuffer)
+	{
+		StateIndex[] stateInd = cast(StateIndex[])(stateBuffer[0..StateIndex.sizeof]);
+		int stateNo = stateInd[0];
+		size_t state_size = 0;
+	
+		switch (stateNo)
+		{
+			foreach (ii, TT; StateList)
+			{
+				case ii:
+				state_size = __traits(getPointerBitmap, TT)[0];
+				break;
+			}
+			
+			default:
+			break;
+		}
+		
+		printf("stateNo: %i\nstate_size: %d\n", stateNo, state_size);
+		
+		fwrite(stateBuffer.ptr, 1, maxStateSerializationSize, fp);
+	}
+	
+	void writeSave()
+	{
+		FILE* fp;
+		
+		fp = fopen("./savestate.save", "w+");
+		//fputs("save stuff here hey\n", fp);
+		
+		writeState(fp, serial[0]);
+		writeState(fp, serial[1]);
+		
+		fclose(fp);
+		
+		printf("State saved to file!\n");
+	}
+	
+	void readState(FILE* fp, ubyte[] stateBuffer)
+	{
+		fread(stateBuffer.ptr, 1, maxStateSerializationSize, fp);
+	}
+	
+	void readSave()
+	{
+		FILE* fp;
+		
+		fp = fopen("./savestate.save", "r");
+		
+		if (fp)
+		{
+			readState(fp, serial[0]);
+			readState(fp, serial[1]);
+			
+			fclose(fp);
+			
+			printf("Save loaded from file!\n");
+		}
+		else
+		{
+			printf("No save file exists!");
+		}
+	}
+}
+
 void setupGame() @nogc
 {
   //P1 = make!Fighter(makeState!Idle(-5.0, 0.0), fighterSkeleton);
@@ -592,6 +680,8 @@ void setupGame() @nogc
   P2 = emplace!Fighter(FighterData[FighterSize..$], makeState!Idle(5.0, 0.0, HorizontalDir.left), skeletons[fighterSkeleton]);
   Players[0] = P1;
   Players[1] = P2;
+  
+  debug{saveState();}
 }
 
 void renderFighters() @nogc
@@ -627,17 +717,6 @@ struct ControlInput
   HorizontalDir horiDir;
   
   bool[4] buttons;
-  
-  // void copyInput(ref ControlInput inp)
-  // {
-	// vertDir = inp.vertDir;
-	// horiDir = inp.horiDir;
-	
-	// foreach(int ii, bool button; inp.buttons)
-	// {
-		// buttons[ii] = button;
-	// }
-  // }
 }
 
 void setButtons(int playerNum, int controlNum) @nogc
@@ -724,6 +803,13 @@ class Fighter
 		  state = tempState;
 		  tempState = null;
 		}
+	  }
+	  
+	  void restoreState(State nState)
+	  {
+		assert(state);
+		breakState(state);
+		state = nState;
 	  }
 	  
 	  void render()
@@ -1079,8 +1165,6 @@ mixin template serializableState()
   override void serializeState(ubyte[] buffer) @nogc
   {
 	serializeSupers!(typeof(retThis()))(this, buffer);
-	
-	dynamicPrint(fullyQualifiedName!(typeof(retThis()))); 
   }
 }
 

@@ -15,6 +15,101 @@ alias float greal;
 alias greal vreal;
 alias greal[16] GLMatrix;
 
+struct Vec2
+{
+	vreal[2] values = 0;
+
+    // vreal x=0;
+    // vreal y=0;
+	
+	@property @nogc {
+		vreal x(vreal V) 
+		{return values[0] = V;}
+		vreal x() const 
+		{return values[0];}
+		
+		vreal y(vreal V) 
+		{return values[1] = V;}
+		vreal y() const 
+		{return values[1];}
+	}
+	
+	this(vreal X, vreal Y) @nogc
+		{x=X; y=Y;}
+
+    @property string toString() const
+    {
+        return stringof;
+    }
+	
+	
+	@property string stringof() const
+    {
+        return format("V[%f, %f]", x, y);
+    }
+    
+    @nogc
+    Vec2 opUnary(string op)()  if (op == "-") { return Vec2(-x, -y); }
+    
+    @nogc
+    Vec2 opBinary(string op)(Vec2 rhs) if (op == "+")
+    {return Vec2(x+rhs.x, y+rhs.y);}
+
+    @nogc
+    Vec2 opBinary(string op)(Vec22 rhs) if (op == "-")
+    {return Vec3(x-rhs.x, y-rhs.y);}
+
+    @nogc
+    Vec2 mult(vreal mul)
+    {
+        return Vec2(x*mul, y*mul);
+    }
+
+    @nogc
+    Vec2 div(vreal den)
+    {
+        return mult(1/den);
+    }
+
+    @nogc
+    vreal dot(Vec2 rhs)
+    {
+        return x*rhs.x +y*rhs.y;
+    }
+
+    @nogc
+    vreal lengthSqr()
+    {
+        return x*x+y*y;
+    }
+
+    @nogc
+    vreal length()
+    {
+        return sqrt(lengthSqr());
+    }
+
+    @nogc
+    vreal norm()
+    {
+        return length();
+    }
+
+    //Returns the normalised unit Vector
+    @nogc
+    Vec2 normalize()
+    {
+        vreal normInv = 1/length();
+        return Vec2(x*normInv, y*normInv);
+    }
+
+    @nogc
+    auto opBinary(string op)(vreal mul)
+    {
+        static if (op == "*")
+            return mult(mul);
+    }
+}
 
 struct Vec3
 {
@@ -43,6 +138,9 @@ struct Vec3
 	
 	this(vreal X, vreal Y, vreal Z) @nogc
 		{x=X; y=Y; z=Z;}
+		
+	this(const ref Vec2 v2) @nogc
+		{x=v2.x; y=v2.y; z=0;}
 
     @property string toString() const
     {

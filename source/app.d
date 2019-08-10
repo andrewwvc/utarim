@@ -8,12 +8,13 @@ import skeleton;
 import manbody;
 import core.time;
 
-
 import allocator.building_blocks.free_list;
 import allocator.mallocator;
 import std.traits;
 import std.conv;
 import std.meta;
+
+import std.socket;
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 1280;
@@ -402,6 +403,8 @@ void realtime() @nogc
 	bool quit = false;
 	//Event handler
 	SDL_Event e;
+	//Is the game paused?
+	bool paused = false;
 	
 	//Gets keyboard input
 	const Uint8* currentKeyStates = SDL_GetKeyboardState(null);
@@ -412,6 +415,11 @@ void realtime() @nogc
 	  takedownControllers();
 	  
 	setupGame();
+	
+	debug
+	{
+		
+	}
 	
 	
 	if (syncType == VSYNC)
@@ -453,6 +461,23 @@ void realtime() @nogc
 			
 			debug
 			{
+				//Pauses/Unpauses game when 'P' is pressed. This should prevent frame advancement, but continue rendering.
+				case SDLK_p:
+				paused = !paused;
+				
+				if (paused)
+					printf("Game Paused!\n");
+				else
+					printf("Game Unpaused!\n");
+				break;
+			
+				/*
+				saveState() saves the game state to a buffer
+				restoreState() loads the game from that buffer
+				
+				writeSave() writes the buffer to a file
+				readSave() loads the file to the buffer used by save/restoreState
+				*/
 				case SDLK_q:
 				saveState();
 				break;
@@ -508,7 +533,8 @@ void realtime() @nogc
 	  setButtons(0, 0);
 	  setButtons(1, 1);
 	  
-	  gameUpdate();
+	  if (!paused)
+		gameUpdate();
 	  
 	  //Clear color buffer
 	  glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -588,6 +614,22 @@ debug
 
 	ubyte[maxStateSerializationSize][2] serial;//For serialization testing
 	
+	size_t getStateSizeFromIndex(StateIndex stateindexNo)
+	{
+		switch (stateindexNo)
+		{
+			foreach (ii, TT; StateList)
+			{
+				case ii:
+				return __traits(getPointerBitmap, TT)[0];
+			}
+			
+			default:
+			printf("Incoherent state!\n");
+			return 0;
+		}
+	}
+	
 	void saveState()
 	{
 		P1.state.serializeState(serial[0]);
@@ -609,25 +651,12 @@ debug
 	void writeState(FILE* fp, in ubyte[] stateBuffer)
 	{
 		StateIndex[] stateInd = cast(StateIndex[])(stateBuffer[0..StateIndex.sizeof]);
-		int stateNo = stateInd[0];
-		size_t state_size = 0;
-	
-		switch (stateNo)
-		{
-			foreach (ii, TT; StateList)
-			{
-				case ii:
-				state_size = __traits(getPointerBitmap, TT)[0];
-				break;
-			}
-			
-			default:
-			break;
-		}
 		
-		printf("stateNo: %i\nstate_size: %d\n", stateNo, state_size);
+		size_t state_size = getStateSizeFromIndex(stateInd[0]);
 		
-		fwrite(stateBuffer.ptr, 1, maxStateSerializationSize, fp);
+		printf("stateNo: %i\nstate_size: %d\n", stateInd[0], state_size);
+		
+		fwrite(stateBuffer.ptr, 1, state_size, fp);
 	}
 	
 	void writeSave()
@@ -647,7 +676,16 @@ debug
 	
 	void readState(FILE* fp, ubyte[] stateBuffer)
 	{
-		fread(stateBuffer.ptr, 1, maxStateSerializationSize, fp);
+		//First read in the state index from the file into the initial bytes of the buffer
+		fread(stateBuffer.ptr, 1, StateIndex.sizeof, fp);
+		
+		//This should then work, given the index (though nothing else yet) is in the buffer
+		StateIndex[] stateInd = cast(StateIndex[])(stateBuffer[0..StateIndex.sizeof]);
+		
+		size_t state_size = getStateSizeFromIndex(stateInd[0]);
+		
+		//Read in the rest of the state, now we know its size
+		fread(stateBuffer.ptr+StateIndex.sizeof, 1, state_size-StateIndex.sizeof, fp);
 	}
 	
 	void readSave()
@@ -944,6 +982,18 @@ size_t serializationSize(T)()
 	return __traits(getPointerBitmap, T)[0] + serializationHeaderSize!(T)();
 }
 
+/*
+This section contains three tiers of serialization function.
+
+Serialize: Serializes an individual subclass, either a struct or one 'level' of a class's hierarchy
+serializeSupers: Takes a class instance with a known type and serializes it, including all of the data in its parent classes
+serializeState: Serializes an instance of a State polymorphically, adding a header consisting of a type index
+
+The 'deserialize' functions correspond to the serialization ones.
+
+*/
+
+
 @nogc
 size_t serialize(T)(ref T instance, ubyte[] output)
 {	
@@ -951,6 +1001,7 @@ size_t serialize(T)(ref T instance, ubyte[] output)
 
 	foreach (ref field; instance.tupleof)
 	{
+		//The 'me' array consists of a single element corresponding to the individual field that has been cast
 		typeof(field)[] me = cast(typeof(field)[])output[offset..offset+field.sizeof];
 		me[0] = field;
 		version(BigEndian)
@@ -971,16 +1022,16 @@ void serializeSupers(TT)(ref TT instance, ubyte[] output)
 	
 	size_t offset = StateIndex.sizeof;
 	
-	alias serClasses = AliasSeq!(TT, Erase!(Object, BaseClassesTuple!(TT)));
+	alias serClasses = Reverse!(AliasSeq!(TT, Erase!(Object, BaseClassesTuple!(TT))));
 	
 	foreach(CC; serClasses)
 	{
 		CC tempCC = cast(CC)(instance);
-		offset += serialize!(CC)(tempCC, output[offset..offset+__traits(getPointerBitmap, CC)[0]]);
+		offset += serialize!(CC)(tempCC, output[offset..+__traits(getPointerBitmap, TT)[0]]);
 	}
-	
-	//serialize!(T)(instance, output[offset..serializationSize!(TT)()]);
 }
+
+//serializeState(ubyte[] input) is a virtual function within the state class
 
 @nogc
 size_t deserialize(T)(ref T instance, ubyte[] input)
@@ -1005,17 +1056,17 @@ void deserializeSupers(TT)(ref TT instance, ubyte[] input)
 {
 	size_t offset = 0;
 	
-	alias serClasses = AliasSeq!(TT, Erase!(Object, BaseClassesTuple!(TT)));
+	alias serClasses = Reverse!(AliasSeq!(TT, Erase!(Object, BaseClassesTuple!(TT))));
 
 	foreach (CC; serClasses)
 	{
 		CC tempCC = cast(CC)(instance);
-		offset += deserialize!(CC)(tempCC, input[offset..offset+__traits(getPointerBitmap, CC)[0]]);
+		offset += deserialize!(CC)(tempCC, input[offset..+__traits(getPointerBitmap, TT)[0]]);
 	}
 }
 
-@nogc
-State deserializeState(ubyte[] input)
+//Takes a buffer of size maxStateSerializationSize, containing a header and state information produced by serializeState
+State deserializeState(ref ubyte[maxStateSerializationSize] input) @nogc
 {
 	StateIndex[] hdr = (cast(StateIndex[])(input[0..StateIndex.sizeof]));
 	
@@ -1043,15 +1094,15 @@ abstract class State
   {x = X; y = Y; facing = faceDirection;}
   
   //Construct bools
-  bool animatedState = false;
-  bool attackState = false;
+  //bool animatedState = false;
+  //bool attackState = false;
   //Use the .offset property in order to store the pointer offset for each individual State and cast this to the AttackSubstate
-  bool defenceState = false;
+  //bool defenceState = false;
   
   //~this() @nogc;
   
   //public greal x, y;
-  public Vec3 pos;
+  public Vec2 pos;
   public HorizontalDir facing;
   // public alias x = pos.x;
   // public alias y = pos.y;
@@ -1068,9 +1119,9 @@ abstract class State
 		{return pos.y;}
 		
 		vreal z(vreal V) 
-		{return pos.z = V;}
+		{return 0;}
 		vreal z() const 
-		{return pos.z;}
+		{return 0;}
 	}
 	
 	static Vec3 movePosition(ref Fighter parent, greal nx, greal ny) @nogc
@@ -1097,6 +1148,7 @@ abstract class State
 		drawSkeletonMesh(parent.skel, animations[fighterAnimSquat], 1, true);
 	}
 	
+	//Function must take a buffer of size at least maxStateSerializationSize.
 	void serializeState(ubyte[] buffer) @nogc;
   
     State makeUpdate(Fighter parent) @nogc;

@@ -1,8 +1,10 @@
 {
 	"name": "utarim",
 	"description": "A minimal D application.",
-	"copyright": "Copyright © 2015, andrew",
+	"copyright": "Copyright © 2015, Andrew",
 	"authors": ["Andrew Van Caem"],
+	"licence": "GPL-3.0",
+	"libs": ["WS2_32"],
 	"dependencies": {
 	"derelict-sdl2": "~>1.9.7",
 	  "derelict-gl3": "~>1.0.24"

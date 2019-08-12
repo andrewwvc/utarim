@@ -14,7 +14,6 @@ import std.traits;
 import std.conv;
 import std.meta;
 
-import std.socket;
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 1280;
@@ -329,6 +328,13 @@ void main()
 		p = Pill3(1, Vec3(0,0,0), Vec3(1, 0, 0));
 		s = Sphere3(1, Vec3(-2, 0, 0.1));
 		writeln("HullTest: " ~ (hullPointTest(p,s)? "T":"F") ~'\n');
+		
+		// auto listener = new TcpSocket();
+		// assert(listener.isAlive);
+		// listener.blocking = false;
+		// listener.bind(new InternetAddress(4444));
+		// listener.listen(10);
+		// printf("Listening on port %d.", 4444);
 	}
 	
 	//Initialize Projection Matrix
@@ -397,6 +403,8 @@ void main()
 
 
 
+
+
 void realtime() @nogc
 {
 	//Main loop flag
@@ -416,11 +424,40 @@ void realtime() @nogc
 	  
 	setupGame();
 	
-	debug
+	void startNetworking() @nogc
 	{
-		
+		version (Windows)
+		{
+			import core.sys.windows.winsock2;
+			
+			WSADATA wsDat;
+			SOCKET s;
+			int ret;
+			
+			ubyte[2] versionReqBytes = [2,2];
+			ushort[] versionReqUShort = cast(ushort[])versionReqBytes[0..2];
+			
+			// Initialize Winsock version 2.2
+		   if ((ret = WSAStartup(versionReqUShort[0], &wsDat)) != 0)
+		   {
+			  printf("WSAStartup failed with error %ld\n", WSAGetLastError());
+
+			  return;
+		   }
+		   
+		   import core.sys.windows.winsock2;
+		   // When your application is finished call WSACleanup
+		   if (WSACleanup() == SOCKET_ERROR)
+		   {
+			  printf("WSACleanup failed with error %d\n", WSAGetLastError());
+		   }
+		   
+		}
 	}
 	
+	//Setup networking
+	startNetworking();
+
 	
 	if (syncType == VSYNC)
 	{
@@ -459,18 +496,31 @@ void realtime() @nogc
 			quit = true;
 			break;
 			
+			
+			//Recieve command input from the console
+			case SDLK_c:
+			printf("Console:\n");
+			
+			import core.stdc.stdio;
+			
+			char[100] inputBuffer;
+			fgets(inputBuffer.ptr, 100, stdin);
+			SDL_PumpEvents();
+			SDL_FlushEvents(0, uint.max);
+			break;
+			
+			//Pauses/Unpauses game when 'P' is pressed. This should prevent frame advancement, but continue rendering.
+			case SDLK_p:
+			paused = !paused;
+			
+			if (paused)
+				printf("Game Paused!\n");
+			else
+				printf("Game Unpaused!\n");
+			break;
+			
 			debug
 			{
-				//Pauses/Unpauses game when 'P' is pressed. This should prevent frame advancement, but continue rendering.
-				case SDLK_p:
-				paused = !paused;
-				
-				if (paused)
-					printf("Game Paused!\n");
-				else
-					printf("Game Unpaused!\n");
-				break;
-			
 				/*
 				saveState() saves the game state to a buffer
 				restoreState() loads the game from that buffer
@@ -519,6 +569,9 @@ void realtime() @nogc
 			}
 			
 			printf("Number of joysticks connected: %i\n", SDL_NumJoysticks());
+			
+			paused = true;
+			printf("Game Paused!\n");
 			
 		}
 		else if (e.type == SDL_JOYDEVICEADDED)
@@ -613,6 +666,7 @@ debug
 	import core.stdc.stdio;
 
 	ubyte[maxStateSerializationSize][2] serial;//For serialization testing
+	const char* saveLocation = "./saves/savestate.save";
 	
 	size_t getStateSizeFromIndex(StateIndex stateindexNo)
 	{
@@ -663,7 +717,7 @@ debug
 	{
 		FILE* fp;
 		
-		fp = fopen("./savestate.save", "w+");
+		fp = fopen(saveLocation, "w+");
 		//fputs("save stuff here hey\n", fp);
 		
 		writeState(fp, serial[0]);
@@ -692,7 +746,7 @@ debug
 	{
 		FILE* fp;
 		
-		fp = fopen("./savestate.save", "r");
+		fp = fopen(saveLocation, "r");
 		
 		if (fp)
 		{
@@ -982,7 +1036,7 @@ size_t serializationSize(T)()
 	return __traits(getPointerBitmap, T)[0] + serializationHeaderSize!(T)();
 }
 
-/*
+/**
 This section contains three tiers of serialization function.
 
 Serialize: Serializes an individual subclass, either a struct or one 'level' of a class's hierarchy
@@ -991,7 +1045,9 @@ serializeState: Serializes an instance of a State polymorphically, adding a head
 
 The 'deserialize' functions correspond to the serialization ones.
 
-*/
+deserializeState: implicitly requires a buffer of size maxStateSerializationSize to be passed to it.
+
+**/
 
 
 @nogc
@@ -1197,7 +1253,7 @@ struct AttackSubstate
 		bool active = false;
 	}
 	
-	AttackBox[10] attacks;
+	ref AttackBox[10] attacks();
 }
 
 mixin template AttackMix()
@@ -1289,8 +1345,6 @@ class Duck : AnimatedState
   }
   
   mixin serializableState;
-  
-  //double[10] weights;
 }
 
 class Kick : AnimatedState

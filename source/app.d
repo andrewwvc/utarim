@@ -401,8 +401,29 @@ void main()
         realtime();
 }
 
+//Winsock helper functions
+@nogc{
+ushort MAKEWORD(ubyte lo, ubyte hi)
+{
+	ubyte[2] array = [lo, hi];
+	ushort[] retArr = cast(ushort[])array;
+	return retArr[0];
+}
 
+ubyte LOBYTE(ushort data)
+{
+	ushort* sPtr = &data;
+	ubyte* bPtr = cast(ubyte*)(sPtr);
+	return *bPtr;
+}
 
+ubyte HIBYTE(ushort data)
+{
+	ushort* sPtr = &data;
+	ubyte* bPtr = cast(ubyte*)(sPtr);
+	return *(bPtr+1);
+}
+}
 
 
 void realtime() @nogc
@@ -424,13 +445,13 @@ void realtime() @nogc
 	  
 	setupGame();
 	
-	void startNetworking() @nogc
+	int startNetworking() @nogc
 	{
 		version (Windows)
 		{
 			import core.sys.windows.winsock2;
 			
-			WSADATA wsDat;
+			WSADATA wsaData;
 			SOCKET s;
 			int ret;
 			
@@ -438,19 +459,41 @@ void realtime() @nogc
 			ushort[] versionReqUShort = cast(ushort[])versionReqBytes[0..2];
 			
 			// Initialize Winsock version 2.2
-		   if ((ret = WSAStartup(versionReqUShort[0], &wsDat)) != 0)
+		   if ((ret = WSAStartup(MAKEWORD(2,2), &wsaData)) != 0)
 		   {
 			  printf("WSAStartup failed with error %ld\n", WSAGetLastError());
 
-			  return;
+			  return 1;
+		   }
+		   else
+		   {
+				printf("The Winsock dll found!\n");
+				printf("The current status is: %s.\n", wsaData.szSystemStatus.ptr);
 		   }
 		   
-		   import core.sys.windows.winsock2;
-		   // When your application is finished call WSACleanup
-		   if (WSACleanup() == SOCKET_ERROR)
+		   if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2 )
 		   {
-			  printf("WSACleanup failed with error %d\n", WSAGetLastError());
+				//Tell the user that we could not find a usable WinSock DLL
+				printf("The dll do not support the Winsock version %u.%u!\n",
+							LOBYTE(wsaData.wVersion),HIBYTE(wsaData.wVersion));
+				// When your application is finished call WSACleanup
+				WSACleanup();
+				// and exit
+				return 0;
 		   }
+		   else
+		   {
+				printf("The dll supports the Winsock version %u.%u!\n", LOBYTE(wsaData.wVersion),
+						HIBYTE(wsaData.wVersion));
+				printf("The highest version this dll can support: %u.%u\n", LOBYTE(wsaData.wHighVersion),
+						HIBYTE(wsaData.wHighVersion));
+
+			   // When your application is finished call WSACleanup
+			   if (WSACleanup() == SOCKET_ERROR)
+				  printf("WSACleanup failed with error %d\n", WSAGetLastError());
+				//and return
+				return 1;
+			}
 		   
 		}
 	}
@@ -666,6 +709,7 @@ debug
 	import core.stdc.stdio;
 
 	ubyte[maxStateSerializationSize][2] serial;//For serialization testing
+	ubyte[2] serialInputs; //Stores input values;
 	const char* saveLocation = "./saves/savestate.save";
 	
 	size_t getStateSizeFromIndex(StateIndex stateindexNo)
@@ -686,6 +730,8 @@ debug
 	
 	void saveState()
 	{
+		serialInputs[0] = serializeControlInput(P1.ci);
+		serialInputs[1] = serializeControlInput(P2.ci);
 		P1.state.serializeState(serial[0]);
 		P2.state.serializeState(serial[1]);
 		
@@ -694,6 +740,8 @@ debug
 	
 	void restoreState()
 	{
+		deserializeControlInput(serialInputs[0], P1.ci);
+		deserializeControlInput(serialInputs[1], P2.ci);
 		State storedState1 = deserializeState(serial[0]);
 		State storedState2 = deserializeState(serial[1]);
 		P1.restoreState(storedState1);
@@ -720,6 +768,7 @@ debug
 		fp = fopen(saveLocation, "w+");
 		//fputs("save stuff here hey\n", fp);
 		
+		fwrite(serialInputs.ptr, ubyte.sizeof, 2, fp);
 		writeState(fp, serial[0]);
 		writeState(fp, serial[1]);
 		
@@ -750,6 +799,7 @@ debug
 		
 		if (fp)
 		{
+			fread(serialInputs.ptr, ubyte.sizeof, 2, fp);
 			readState(fp, serial[0]);
 			readState(fp, serial[1]);
 			
@@ -811,12 +861,38 @@ struct ControlInput
   bool[4] buttons;
 }
 
+ubyte serializeControlInput(ref ControlInput cInput) @nogc
+{
+	with (cInput)
+	{
+		ubyte vir = cast(ubyte)((cast(int)(vertDir))+1);
+		ubyte hor = cast(ubyte)(((cast(int)(horiDir))+1) << 2);
+		ubyte[4] bs = [(cast(ubyte)buttons[0]) << 4, (cast(ubyte)buttons[1]) << 5, (cast(ubyte)buttons[2]) << 6, (cast(ubyte)buttons[3]) << 7];
+		return vir | hor | bs[0] | bs[1] | bs[2] | bs[3];
+	}
+}
+
+void deserializeControlInput(ubyte inByte, ref ControlInput cInputOut) @nogc
+{
+	with (cInputOut)
+	{
+		vertDir = cast(VerticalDir)		((cast(int)	(inByte & 0b00000011)) - 1);
+		horiDir = cast(HorizontalDir)	((cast(int)((inByte & 0b00001100) >>> 2)) - 1);
+		buttons[0] = cast(bool)			(			(inByte & 0b00010000) >>> 4);
+		buttons[1] = cast(bool)			(			(inByte & 0b00100000) >>> 5);
+		buttons[2] = cast(bool)			(			(inByte & 0b01000000) >>> 6);
+		buttons[3] = cast(bool)			(			(inByte & 0b10000000) >>> 7);
+	}
+}
+
+
 void setButtons(int playerNum, int controlNum) @nogc
 {
   if (gGameControllers[controlNum])
   {
 	with (Players[playerNum])
 	{
+		//Causes the past values to take on those which were in current.
 		pi = ci;
 	}
   
@@ -1149,11 +1225,14 @@ abstract class State
   this(greal X, greal Y, HorizontalDir faceDirection) @nogc
   {x = X; y = Y; facing = faceDirection;}
   
+  @("noser")
+  {
   //Construct bools
-  //bool animatedState = false;
-  //bool attackState = false;
+  bool animatedState = false;
+  bool attackState = false;
   //Use the .offset property in order to store the pointer offset for each individual State and cast this to the AttackSubstate
-  //bool defenceState = false;
+  bool defenceState = false;
+  }
   
   //~this() @nogc;
   

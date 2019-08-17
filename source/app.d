@@ -453,23 +453,24 @@ void realtime() @nogc
 			
 			WSADATA wsaData;
 			SOCKET s;
-			int ret;
-			
-			ubyte[2] versionReqBytes = [2,2];
-			ushort[] versionReqUShort = cast(ushort[])versionReqBytes[0..2];
 			
 			// Initialize Winsock version 2.2
-		   if ((ret = WSAStartup(MAKEWORD(2,2), &wsaData)) != 0)
+		   if ((WSAStartup(MAKEWORD(2,2), &wsaData)) != 0)
 		   {
 			  printf("WSAStartup failed with error %ld\n", WSAGetLastError());
 
 			  return 1;
 		   }
-		   else
-		   {
-				printf("The Winsock dll found!\n");
-				printf("The current status is: %s.\n", wsaData.szSystemStatus.ptr);
-		   }
+
+			printf("Winsock DLL found!\n");
+			printf("The current status is: %s.\n", wsaData.szSystemStatus.ptr);
+
+			// When your application is finished call WSACleanup
+			scope(exit)
+			{
+				if (WSACleanup() == SOCKET_ERROR)
+				  printf("WSACleanup failed with error %d\n", WSAGetLastError());
+			}
 		   
 		   if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2 )
 		   {
@@ -477,24 +478,17 @@ void realtime() @nogc
 				printf("The dll do not support the Winsock version %u.%u!\n",
 							LOBYTE(wsaData.wVersion),HIBYTE(wsaData.wVersion));
 				// When your application is finished call WSACleanup
-				WSACleanup();
-				// and exit
 				return 0;
 		   }
-		   else
-		   {
-				printf("The dll supports the Winsock version %u.%u!\n", LOBYTE(wsaData.wVersion),
-						HIBYTE(wsaData.wVersion));
-				printf("The highest version this dll can support: %u.%u\n", LOBYTE(wsaData.wHighVersion),
-						HIBYTE(wsaData.wHighVersion));
 
-			   // When your application is finished call WSACleanup
-			   if (WSACleanup() == SOCKET_ERROR)
-				  printf("WSACleanup failed with error %d\n", WSAGetLastError());
-				//and return
-				return 1;
-			}
-		   
+			printf("The DLL supports the Winsock version %u.%u!\n", LOBYTE(wsaData.wVersion),
+					HIBYTE(wsaData.wVersion));
+			printf("The highest version this dll can support: %u.%u\n", LOBYTE(wsaData.wHighVersion),
+					HIBYTE(wsaData.wHighVersion));
+			
+			//Bind UDP socket here.
+			
+			return 1;
 		}
 	}
 	

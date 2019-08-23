@@ -402,27 +402,28 @@ void main()
 }
 
 //Winsock helper functions
-@nogc{
-ushort MAKEWORD(ubyte lo, ubyte hi)
+@nogc
 {
-	ubyte[2] array = [lo, hi];
-	ushort[] retArr = cast(ushort[])array;
-	return retArr[0];
-}
+	ushort MAKEWORD(ubyte lo, ubyte hi)
+	{
+		ubyte[2] array = [lo, hi];
+		ushort[] retArr = cast(ushort[])array;
+		return retArr[0];
+	}
 
-ubyte LOBYTE(ushort data)
-{
-	ushort* sPtr = &data;
-	ubyte* bPtr = cast(ubyte*)(sPtr);
-	return *bPtr;
-}
+	ubyte LOBYTE(ushort data)
+	{
+		ushort* sPtr = &data;
+		ubyte* bPtr = cast(ubyte*)(sPtr);
+		return *bPtr;
+	}
 
-ubyte HIBYTE(ushort data)
-{
-	ushort* sPtr = &data;
-	ubyte* bPtr = cast(ubyte*)(sPtr);
-	return *(bPtr+1);
-}
+	ubyte HIBYTE(ushort data)
+	{
+		ushort* sPtr = &data;
+		ubyte* bPtr = cast(ubyte*)(sPtr);
+		return *(bPtr+1);
+	}
 }
 
 
@@ -435,9 +436,24 @@ void realtime() @nogc
 	//Is the game paused?
 	bool paused = false;
 	
+	alias Side = bool;
+	
+	const Side LEFT = false;
+	const Side RIGHT = true;
+	
+	Side playerSide = LEFT;
+	
+	void toggleSide() @nogc
+	{
+		playerSide = !playerSide;
+	}
+	
 	//Gets keyboard input
 	const Uint8* currentKeyStates = SDL_GetKeyboardState(null);
 	uint initTime = SDL_GetTicks();
+	
+	alias FrameNo = ushort;
+	FrameNo frameCounter = 0;
 	
 	setupControllers();
 	scope(exit)
@@ -453,6 +469,7 @@ void realtime() @nogc
 	int networkStartSuccess = UNUSED;
 	int networkConnectSuccess = UNUSED;//Default state
 	
+	
 	bool NetworkingCurrentlyEnabled = false;
 	
 	version (Windows)
@@ -460,11 +477,12 @@ void realtime() @nogc
 		import core.sys.windows.winsock2;
 
 		WSADATA wsaData;
-		//SOCKET recv;
 		SOCKET ss;
 		char[32] sendIPString;
-		SOCKADDR_IN sendAddr;
 		SOCKADDR_IN receiveAddr;
+		
+		SOCKADDR recievedSenderAddr;
+		int receivedSenderSize = SOCKADDR.sizeof;
 		ushort port = 5998;
 		
 		
@@ -540,9 +558,6 @@ void realtime() @nogc
 					printf("Server: Closing \\Server\\ socket...\n");
 			}
 			
-			//Sets timeout value to 10 seconds
-			uint timeoutValue = 10000;
-			setsockopt(ss, SOL_SOCKET, SO_RCVTIMEO, cast(const(void)*) &timeoutValue, timeoutValue.sizeof);
 			
 			// The IPv4 family
 			receiveAddr.sin_family = AF_INET;
@@ -585,16 +600,20 @@ void realtime() @nogc
 			if (opponentIPstring[0] == '\0' || opponentIPstring[0] == '\n')
 			{
 				//Returns UNUSED so that networking can be disabled when an 'empty' string is passed in.
-				printf("Networking set to off.\n");
-				return UNUSED;
+				printf("Networking set to self.\n");
 			}
+			
+			SOCKADDR_IN sendAddr;
 		
 			// The IPv4 family
 			sendAddr.sin_family = AF_INET;
 			// host-to-network byte order
 			sendAddr.sin_port = htons(port);
 			// Listen on all interface, host-to-network byte order
-			sendAddr.sin_addr.s_addr = inet_addr(opponentIPstring.ptr);
+			if (opponentIPstring[0] == '\0' || opponentIPstring[0] == '\n')
+				sendAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+			else
+				sendAddr.sin_addr.s_addr = inet_addr(opponentIPstring.ptr);
 			
 			ubyte[16] sendBuff = cast(ubyte[16]) "Hello, how are u";//[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
 			
@@ -605,11 +624,13 @@ void realtime() @nogc
 				return FAILURE;
 			}
 			
-			SOCKADDR 	   recievedSenderAddr;
-			int receivedSenderSize = SOCKADDR.sizeof;
+			//Sets timeout value to 10 seconds
+			uint timeoutValue = 10000;
+			setsockopt(ss, SOL_SOCKET, SO_RCVTIMEO, cast(const(void)*) &timeoutValue, timeoutValue.sizeof);
+			
 			ubyte[512] msgBuffer;
 			
-			int msgLength = recvfrom(ss, cast(void*)msgBuffer.ptr, cast(int)msgBuffer.length, 0, &recievedSenderAddr, &receivedSenderSize);
+			int msgLength = recvfrom(ss, cast(void*)msgBuffer.ptr, cast(int)msgBuffer.length-1, 0, &recievedSenderAddr, &receivedSenderSize);
 		 
 			if (msgLength == SOCKET_ERROR)
 			{
@@ -617,21 +638,16 @@ void realtime() @nogc
 				return FAILURE;
 			}
 			
-			import core.stdc.stdlib;
-			
-			//MALLOC
-			char* msgSafe = cast(char*) malloc(msgLength+1);
-			
-				msgSafe[0..msgLength] = cast(char[]) msgBuffer[0..msgLength];
-				msgSafe[msgLength] = '\0';
+			msgBuffer[msgBuffer.length-1] = '\0';
 				
-				printf("Message: %s\n", msgSafe);
-			
-			//FREE
-			free(msgSafe);
+			printf("Message: %s\n", cast(char*)msgBuffer.ptr);
 
 			sendto(ss, cast(void*)sendBuff.ptr, sendBuff.sizeof, 0,
 				&recievedSenderAddr, receivedSenderSize);
+			
+			//Sets timeout value to 1 second
+			timeoutValue = 1000;
+			setsockopt(ss, SOL_SOCKET, SO_RCVTIMEO, cast(const(void)*) &timeoutValue, timeoutValue.sizeof);
 			
 			with ((cast(sockaddr_in)recievedSenderAddr).sin_addr.S_un.S_un_b)
 			{			
@@ -649,6 +665,81 @@ void realtime() @nogc
 			else
 				printf("Networking disabled!\n");
 				
+			return SUCCESS;
+		}
+		
+		int performNetworkSync() @nogc
+		{
+			if (networkStartSuccess == SUCCESS && networkConnectSuccess == SUCCESS && NetworkingCurrentlyEnabled)
+			{
+				const size_t bufferSize = 4;
+				ubyte[bufferSize] sendMsgBuffer;
+				ubyte[bufferSize] rcvMsgBuffer;
+				/*
+				[0] = 'c'
+				[1] = lower timestamp
+				[2] = upper timestamp
+				[3] = control inputs
+				*/
+				
+				size_t pIndex = cast(size_t) playerSide;
+				size_t oIndex = cast(size_t) !playerSide;
+				
+				
+				//Signal character
+				sendMsgBuffer[0] = 'c';
+				
+				//Frame specific timestamp
+				FrameNo[1] frameCountTemp = frameCounter;
+				sendMsgBuffer[1..3] = cast(ubyte[2]) frameCountTemp;
+				version(BigEndian)
+				{
+					reverse(sendMsgBuffer[1..3]);
+				}
+				
+				with (Players[pIndex])
+				{
+					sendMsgBuffer[3] = serializeControlInput(ci);
+				}
+				
+				sendto(ss, cast(void*)sendMsgBuffer.ptr, sendMsgBuffer.sizeof, 0,
+				&recievedSenderAddr, receivedSenderSize);
+				
+				SOCKADDR msgSenderAdr;
+				int msgSenderAdrSize = msgSenderAdr.sizeof;
+				
+				bool loopFlag = true;
+				//Receive input
+				do
+				{
+					int msgLength = recvfrom(ss, cast(void*)rcvMsgBuffer.ptr, cast(int)rcvMsgBuffer.length, 0, &msgSenderAdr, &msgSenderAdrSize);
+					
+					if (msgLength == SOCKET_ERROR)
+					{
+						printf("Network connection issues...\n");
+						return FAILURE;
+					}
+					
+					if ((cast(sockaddr_in) msgSenderAdr).sin_addr.s_addr == (cast(sockaddr_in)recievedSenderAddr).sin_addr.s_addr
+						&& rcvMsgBuffer[0] == 'c')
+					{
+						version(BigEndian)
+						{
+							reverse(rcvMsgBuffer[1..3]);
+						}
+						FrameNo[1] rcvFrameCounter  = cast(FrameNo[1]) rcvMsgBuffer[1..3];
+						if (rcvFrameCounter[0] == frameCounter)
+						{
+							deserializeControlInput(rcvMsgBuffer[3], Players[oIndex].ci);
+							break;
+						}
+					}
+					
+				} while (true);
+				
+				//Deserialize input
+			}
+		
 			return SUCCESS;
 		}
 		
@@ -731,6 +822,16 @@ void realtime() @nogc
 			networkConnectSuccess = setupConnection(inputBuffer);
 			break;
 			
+			case SDLK_j:
+			playerSide = LEFT;
+			printf("Player One assigned to the LEFT!\n");
+			break;
+			
+			case SDLK_k:
+			playerSide = RIGHT;
+			printf("Player One assigned to the RIGHT!\n");
+			break;
+			
 			//Enabled/disables Network data based gameplay
 			case SDLK_n:
 			toggleNetworking();
@@ -810,8 +911,18 @@ void realtime() @nogc
 	    
 	  }
 	  
-	  setButtons(0, 0);
-	  setButtons(1, 1);
+	  if (playerSide == LEFT)
+	  {
+		  setButtons(0, 0);
+		  setButtons(1, 1);
+	  }
+	  else
+	  {
+		setButtons(0, 1);
+		setButtons(1, 0);
+	  }
+	  
+	  performNetworkSync();
 	  
 	  if (!paused)
 		gameUpdate();
@@ -865,6 +976,7 @@ void realtime() @nogc
 	  }
 	  
 	  lastTime = newTime;
+	  frameCounter++;
 	}
 	
 
@@ -1072,14 +1184,14 @@ void deserializeControlInput(ubyte inByte, ref ControlInput cInputOut) @nogc
 
 void setButtons(int playerNum, int controlNum) @nogc
 {
-  if (gGameControllers[controlNum])
-  {
 	with (Players[playerNum])
 	{
 		//Causes the past values to take on those which were in current.
 		pi = ci;
 	}
-  
+
+  if (gGameControllers[controlNum])
+  {
     with(Players[playerNum].ci)
     {
       int numButtons = SDL_JoystickNumButtons(gGameControllers[controlNum]);
@@ -1108,6 +1220,17 @@ void setButtons(int playerNum, int controlNum) @nogc
 		else if (dir == SDL_HAT_RIGHTDOWN)
 			{vertDir = VerticalDir.down; horiDir = HorizontalDir.right;}
     }
+  }
+  else
+  {
+	with(Players[playerNum].ci)
+	{
+		foreach (int ii, ref bool button; buttons)
+			button = 0;
+		
+		vertDir = VerticalDir.neutral;
+		horiDir = HorizontalDir.neutral;
+	}
   }
 }
 

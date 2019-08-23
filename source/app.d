@@ -221,7 +221,7 @@ void main()
 	//This should load the lastest version, this isn't necessary if we fall back on a function
 	version(Linux) DerelictSDL2.load("/usr/local/lib/libSDL2.so");
 	version(Windows) DerelictSDL2.load();
-    DerelictGL.load();
+    DerelictGL.load();//DerelictGL.reload() must be called after an OpenGL context is created
 	
 	if (SDL_Init( SDL_INIT_VIDEO | SDL_INIT_JOYSTICK ) < 0)
 	  {printf("SDL could not initialize! SDL Error: %s\n", SDL_GetError()); return;}
@@ -445,55 +445,239 @@ void realtime() @nogc
 	  
 	setupGame();
 	
-	int startNetworking() @nogc
+	//Initialize networkinG status variables;
+	const int UNUSED = -1;
+	const int SUCCESS = 0;
+	const int FAILURE = 1;
+	
+	int networkStartSuccess = UNUSED;
+	int networkConnectSuccess = UNUSED;//Default state
+	
+	bool NetworkingCurrentlyEnabled = false;
+	
+	version (Windows)
 	{
-		version (Windows)
+		import core.sys.windows.winsock2;
+
+		WSADATA wsaData;
+		//SOCKET recv;
+		SOCKET ss;
+		char[32] sendIPString;
+		SOCKADDR_IN sendAddr;
+		SOCKADDR_IN receiveAddr;
+		ushort port = 5998;
+		
+		
+			
+	
+		int startNetworking() @nogc
 		{
-			import core.sys.windows.winsock2;
-			
-			WSADATA wsaData;
-			SOCKET s;
-			
 			// Initialize Winsock version 2.2
-		   if ((WSAStartup(MAKEWORD(2,2), &wsaData)) != 0)
-		   {
+			if ((WSAStartup(MAKEWORD(2,2), &wsaData)) != 0)
+			{
 			  printf("WSAStartup failed with error %ld\n", WSAGetLastError());
 
-			  return 1;
-		   }
+			  return FAILURE;
+			}
 
 			printf("Winsock DLL found!\n");
 			printf("The current status is: %s.\n", wsaData.szSystemStatus.ptr);
-
-			// When your application is finished call WSACleanup
-			scope(exit)
-			{
-				if (WSACleanup() == SOCKET_ERROR)
-				  printf("WSACleanup failed with error %d\n", WSAGetLastError());
-			}
 		   
-		   if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2 )
-		   {
+			if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2 )
+			{
 				//Tell the user that we could not find a usable WinSock DLL
-				printf("The dll do not support the Winsock version %u.%u!\n",
+				printf("The DLL does not support Winsock version %u.%u!\n",
 							LOBYTE(wsaData.wVersion),HIBYTE(wsaData.wVersion));
 				// When your application is finished call WSACleanup
-				return 0;
-		   }
+				if (WSACleanup() == SOCKET_ERROR)
+					printf("WSACleanup failed with error %d\n", WSAGetLastError());
+				else
+					printf("Closed Winsock.\n\n");
+				
+				return FAILURE;
+			}
 
-			printf("The DLL supports the Winsock version %u.%u!\n", LOBYTE(wsaData.wVersion),
+			printf("The DLL supports Winsock version %u.%u!\n", LOBYTE(wsaData.wVersion),
 					HIBYTE(wsaData.wVersion));
-			printf("The highest version this dll can support: %u.%u\n", LOBYTE(wsaData.wHighVersion),
+			printf("The highest version this DLL can support is: %u.%u\n", LOBYTE(wsaData.wHighVersion),
 					HIBYTE(wsaData.wHighVersion));
-			
+					
 			//Bind UDP socket here.
+			ss = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 			
-			return 1;
+			if (ss == INVALID_SOCKET)
+			{
+			  printf("Server: Error occured in socket(), error code: %ld\n", WSAGetLastError());
+			  
+			if (WSACleanup() == SOCKET_ERROR)
+				printf("WSACleanup failed with error %d\n", WSAGetLastError());
+			else
+				printf("Closed Winsock.\n\n");
+		  
+			  return FAILURE;
+			}
+			
+			printf("Server: New socket is OK!\n");
+			
+			const uint BLOCKING_SOCKET = 0;
+			const uint NON_BLOCKING_SOCKET = 1;
+			
+			//Socket set to be non-blocking
+			uint iMode = BLOCKING_SOCKET;//One means not-blocking, why this isn't already defined as a constant I have no idea
+			int iResult = ioctlsocket(ss, FIONBIO, &iMode);
+			if (iResult == SOCKET_ERROR)
+			{
+				printf("ioctlsocket failed with error: %ld\n", iResult);
+				
+				if (WSACleanup() == SOCKET_ERROR)
+					printf("WSACleanup failed with error %d\n", WSAGetLastError());
+				else
+					printf("Closed Winsock.\n\n");
+					
+				if(closesocket(ss) == SOCKET_ERROR)
+					printf("Server: Cannot close \\Server\\ socket. Error code: %ld\n", WSAGetLastError());
+				else
+					printf("Server: Closing \\Server\\ socket...\n");
+			}
+			
+			//Sets timeout value to 10 seconds
+			uint timeoutValue = 10000;
+			setsockopt(ss, SOL_SOCKET, SO_RCVTIMEO, cast(const(void)*) &timeoutValue, timeoutValue.sizeof);
+			
+			// The IPv4 family
+			receiveAddr.sin_family = AF_INET;
+			// host-to-network byte order
+			receiveAddr.sin_port = htons(port);
+			// Listen on all interface, host-to-network byte order
+			receiveAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+			
+			if (bind(ss, cast(SOCKADDR *)&receiveAddr, receiveAddr.sizeof) == SOCKET_ERROR)
+			{
+				printf("Server: bind() failed! Error code: %ld.\n", WSAGetLastError());
+				
+				if (WSACleanup() == SOCKET_ERROR)
+					printf("WSACleanup failed with error %d\n", WSAGetLastError());
+				else
+					printf("Closed Winsock.\n\n");
+					
+				if(closesocket(ss) == SOCKET_ERROR)
+					printf("Server: Cannot close \\Server\\ socket. Error code: %ld\n", WSAGetLastError());
+				else
+					printf("Server: Closing \\Server\\ socket...\n");
+				
+				return FAILURE;
+			}
+			
+			printf("Socket bound to port: %i\n", port);
+			
+			return SUCCESS;
+		}
+		
+		//Accepts a null terminated string
+		int setupConnection(const char[] opponentIPstring) @nogc
+		{
+			if (networkStartSuccess != SUCCESS)
+			{
+				printf("Network procedures failed to initialize, so networking is not available.\n");
+				return FAILURE;
+			}
+			
+			if (opponentIPstring[0] == '\0' || opponentIPstring[0] == '\n')
+			{
+				//Returns UNUSED so that networking can be disabled when an 'empty' string is passed in.
+				printf("Networking set to off.\n");
+				return UNUSED;
+			}
+		
+			// The IPv4 family
+			sendAddr.sin_family = AF_INET;
+			// host-to-network byte order
+			sendAddr.sin_port = htons(port);
+			// Listen on all interface, host-to-network byte order
+			sendAddr.sin_addr.s_addr = inet_addr(opponentIPstring.ptr);
+			
+			ubyte[16] sendBuff = cast(ubyte[16]) "Hello, how are u";//[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+			
+			if  (SOCKET_ERROR == sendto(ss, cast(void*)sendBuff.ptr, sendBuff.sizeof, 0,
+					cast(SOCKADDR *) &sendAddr, sendAddr.sizeof))
+			{
+				printf("sendto failed with error: %d\n", WSAGetLastError());
+				return FAILURE;
+			}
+			
+			SOCKADDR 	   recievedSenderAddr;
+			int receivedSenderSize = SOCKADDR.sizeof;
+			ubyte[512] msgBuffer;
+			
+			int msgLength = recvfrom(ss, cast(void*)msgBuffer.ptr, cast(int)msgBuffer.length, 0, &recievedSenderAddr, &receivedSenderSize);
+		 
+			if (msgLength == SOCKET_ERROR)
+			{
+				printf("Server: recvfrom() failed! Error code: %ld.\n", WSAGetLastError());
+				return FAILURE;
+			}
+			
+			import core.stdc.stdlib;
+			
+			//MALLOC
+			char* msgSafe = cast(char*) malloc(msgLength+1);
+			
+				msgSafe[0..msgLength] = cast(char[]) msgBuffer[0..msgLength];
+				msgSafe[msgLength] = '\0';
+				
+				printf("Message: %s\n", msgSafe);
+			
+			//FREE
+			free(msgSafe);
+
+			sendto(ss, cast(void*)sendBuff.ptr, sendBuff.sizeof, 0,
+				&recievedSenderAddr, receivedSenderSize);
+			
+			with ((cast(sockaddr_in)recievedSenderAddr).sin_addr.S_un.S_un_b)
+			{			
+				printf("Opponent IP set to : %i.%i.%i.%i\n", s_b1, s_b2, s_b3, s_b4);
+			}
+			
+			return SUCCESS;
+		}
+		
+		int toggleNetworking() @nogc
+		{
+			NetworkingCurrentlyEnabled = !NetworkingCurrentlyEnabled;
+			if (NetworkingCurrentlyEnabled)
+				printf("Networking enabled!\n");
+			else
+				printf("Networking disabled!\n");
+				
+			return SUCCESS;
+		}
+		
+		void closeNetworking() @nogc
+		{
+			if (networkStartSuccess == SUCCESS)
+			{
+				if(closesocket(ss) == SOCKET_ERROR)
+					printf("Server: Cannot close \\Server\\ socket. Error code: %ld\n", WSAGetLastError());
+				else
+					printf("Server: Closing \\Server\\ socket...\n");
+			
+				// When your application is finished call WSACleanup
+				if (WSACleanup() == SOCKET_ERROR)
+					printf("WSACleanup failed with error %d\n", WSAGetLastError());
+				else
+					printf("Closed Winsock.\n\n");
+			}
 		}
 	}
 	
 	//Setup networking
-	startNetworking();
+	networkStartSuccess = startNetworking();
+	//networkConnectSuccess = setupConnection("127.0.0.1");
+	
+	//Return value 0 means success
+	scope (exit)
+		closeNetworking();
+	
 
 	
 	if (syncType == VSYNC)
@@ -540,10 +724,16 @@ void realtime() @nogc
 			
 			import core.stdc.stdio;
 			
-			char[100] inputBuffer;
-			fgets(inputBuffer.ptr, 100, stdin);
+			char[32] inputBuffer;
+			fgets(inputBuffer.ptr, 32, stdin);
 			SDL_PumpEvents();
-			SDL_FlushEvents(0, uint.max);
+			//SDL_FlushEvents(0, uint.max);
+			networkConnectSuccess = setupConnection(inputBuffer);
+			break;
+			
+			//Enabled/disables Network data based gameplay
+			case SDLK_n:
+			toggleNetworking();
 			break;
 			
 			//Pauses/Unpauses game when 'P' is pressed. This should prevent frame advancement, but continue rendering.

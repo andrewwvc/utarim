@@ -455,6 +455,11 @@ void realtime() @nogc
 	alias FrameNo = ushort;
 	FrameNo frameCounter = 0;
 	
+	void resetFrameCounter() @nogc
+	{
+		frameCounter = 0;
+	}
+	
 	setupControllers();
 	scope(exit)
 	  takedownControllers();
@@ -653,6 +658,11 @@ void realtime() @nogc
 			{			
 				printf("Opponent IP set to : %i.%i.%i.%i\n", s_b1, s_b2, s_b3, s_b4);
 			}
+			
+			NetworkingCurrentlyEnabled = true;
+			printf("Networking enabled!\n");
+			
+			resetFrameCounter();
 			
 			return SUCCESS;
 		}

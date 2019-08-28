@@ -22,6 +22,8 @@ const int SCREEN_HEIGHT = 1024;
 //Ideal frame timing
 const long FRAME_RATE = 60;
 
+const size_t NoPlayers = 2;
+
 SDL_Window* gWindow;
 
 //OpenGL context
@@ -69,7 +71,7 @@ void setupSkelGL()
 }
 
 //Globals
-SDL_Joystick*[2] gGameControllers;
+SDL_Joystick*[NoPlayers] gGameControllers;
 //SDL_JoystickID[2] gGameControlerInstanceIDs;
 
 void setupControllers() nothrow @nogc
@@ -186,6 +188,53 @@ AnimationIndex fighterAnimKick, fighterAnimSquat;
 
 Skeleton[1] skeletons;
 Animation[4] animations;
+
+const size_t totalOfStoredFrames = 10;
+
+struct GameFrame
+{
+	ubyte[maxStateSerializationSize][NoPlayers] fStates;
+	ubyte[NoPlayers][totalOfStoredFrames] fInputs;
+}
+
+// struct GameFrameQueue
+// {
+	// byte currentFrameIndex = totalOfStoredFrames-1;
+	// byte noStored = 0;
+	// ubyte[maxStateSerializationSize][NoPlayers][totalOfStoredFrames] frameState;
+	// ubyte[NoPlayers][totalOfStoredFrames] frameInput;
+	
+	// void insertFrame(ref Fighter[NoPlayers] fighters)
+	// {
+		// currentFrameIndex = (currentFrameIndex + 1) % totalOfStoredFrames;
+		
+		// if (noStored < totalOfStoredFrames)
+			// noStored++;
+		
+		// foreach(ii, fighter; fighters)
+		// {
+			// fighter.state.serializeState(frameState[currentFrameIndex][ii]);
+			// frameInput[currentFrameIndex][ii] = serializeControlInput(fighter.ci);
+		// }
+	// }
+	
+
+	// ref GameFrame retriveMinusNthFrame(int nn)
+	// {
+		// if (nn >= noStored)
+			// return null;
+			
+		// return null;
+	// }
+	
+	// //Reduces the noStored to 0, without overwirting elements unnecessarily
+	// void softReset()
+	// {
+		// noStored = 0;
+	// }
+	
+	
+// }
 
 debug
 void dynamicPrint(string st) @nogc
@@ -485,10 +534,12 @@ void realtime() @nogc
 		SOCKET ss;
 		char[32] sendIPString;
 		SOCKADDR_IN receiveAddr;
+		ushort port = 5998;
 		
+		SOCKET opposingSocket;
 		SOCKADDR recievedSenderAddr;
 		int receivedSenderSize = SOCKADDR.sizeof;
-		ushort port = 5998;
+		ushort opposingPort = 49970;
 		
 		
 			
@@ -635,7 +686,8 @@ void realtime() @nogc
 			
 			ubyte[512] msgBuffer;
 			
-			int msgLength = recvfrom(ss, cast(void*)msgBuffer.ptr, cast(int)msgBuffer.length-1, 0, &recievedSenderAddr, &receivedSenderSize);
+			//passing in .length-1 is important, as it allows space for the null terminator
+			int msgLength = recvfrom(ss, cast(void*)msgBuffer.ptr, cast(int)msgBuffer.length - 1, 0, &recievedSenderAddr, &receivedSenderSize);
 		 
 			if (msgLength == SOCKET_ERROR)
 			{
@@ -646,18 +698,79 @@ void realtime() @nogc
 			msgBuffer[msgBuffer.length-1] = '\0';
 				
 			printf("Message: %s\n", cast(char*)msgBuffer.ptr);
+			
+			char[5] hello = ['H', 'e', 'l', 'l', 'o'];
+			
+			if (msgBuffer[0..5] !=  hello)
+			{
+				printf("Handshake failed. Opponent did not say Hello!\n");
+				return FAILURE;
+			}
 
 			sendto(ss, cast(void*)sendBuff.ptr, sendBuff.sizeof, 0,
 				&recievedSenderAddr, receivedSenderSize);
 			
-			//Sets timeout value to 1 second
-			timeoutValue = 1000;
-			setsockopt(ss, SOL_SOCKET, SO_RCVTIMEO, cast(const(void)*) &timeoutValue, timeoutValue.sizeof);
+			//Set opposing port no.
+			(cast(SOCKADDR_IN)recievedSenderAddr).sin_port =  htons(opposingPort);
 			
 			with ((cast(sockaddr_in)recievedSenderAddr).sin_addr.S_un.S_un_b)
 			{			
 				printf("Opponent IP set to : %i.%i.%i.%i\n", s_b1, s_b2, s_b3, s_b4);
 			}
+			
+			//Setup new connected Socket
+			
+			//First remove old socket
+			if (networkConnectSuccess == SUCCESS)
+			{
+				if(closesocket(opposingSocket) == SOCKET_ERROR)
+				{
+					printf("Server: Cannot close \\Opponent\\ socket. Error code: %ld\n", WSAGetLastError());
+					return FAILURE;
+				}
+				else
+					printf("Server: Closing \\Opponent\\ socket...\n");
+			}
+			
+			opposingSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+			
+			if (opposingSocket == INVALID_SOCKET)
+			{
+			  printf("Server: Error occured in socket() for OpposingSocket, error code: %ld\n", WSAGetLastError());
+			  
+			  return FAILURE;
+			}
+			
+			//We have to bind() anyway because of how Winsock works
+			if (bind(opposingSocket, &recievedSenderAddr,  receivedSenderSize) == SOCKET_ERROR)
+			{
+				printf("Bind failed! Error code: %ld.\n", WSAGetLastError());
+			
+				if(closesocket(opposingSocket) == SOCKET_ERROR)
+					printf("Server: Cannot close \\Opponent\\ socket. Error code: %ld\n", WSAGetLastError());
+				else
+					printf("Server: Closing \\Opponent\\ socket...\n");
+					
+				return FAILURE;
+			}
+			
+			if (connect(opposingSocket, &recievedSenderAddr, receivedSenderSize) == SOCKET_ERROR)
+			{
+				printf("Connect failed! Error code: %ld.\n", WSAGetLastError());
+				
+				if(closesocket(opposingSocket) == SOCKET_ERROR)
+					printf("Server: Cannot close \\Opponent\\ socket. Error code: %ld\n", WSAGetLastError());
+				else
+					printf("Server: Closing \\Opponent\\ socket...\n");
+					
+				return FAILURE;
+			}
+			
+			//Sets timeout value to 1 second
+			timeoutValue = 1000;
+			setsockopt(opposingSocket , SOL_SOCKET, SO_RCVTIMEO, cast(const(void)*) &timeoutValue, timeoutValue.sizeof);
+			
+			printf("Server: New opposing socket is OK!\n");
 			
 			NetworkingCurrentlyEnabled = true;
 			printf("Networking enabled!\n");
@@ -712,8 +825,13 @@ void realtime() @nogc
 					sendMsgBuffer[3] = serializeControlInput(ci);
 				}
 				
-				sendto(ss, cast(void*)sendMsgBuffer.ptr, sendMsgBuffer.sizeof, 0,
-				&recievedSenderAddr, receivedSenderSize);
+				//sendto(ss, cast(void*)sendMsgBuffer.ptr, sendMsgBuffer.sizeof, 0,
+				//&recievedSenderAddr, receivedSenderSize);
+				
+				if (send(opposingSocket, cast(void*)sendMsgBuffer.ptr, sendMsgBuffer.sizeof, 0) == SOCKET_ERROR)
+				{
+					printf("Sending failed! Error code: %ld.\n", WSAGetLastError());
+				}
 				
 				SOCKADDR msgSenderAdr;
 				int msgSenderAdrSize = msgSenderAdr.sizeof;
@@ -722,7 +840,8 @@ void realtime() @nogc
 				//Receive input
 				do
 				{
-					int msgLength = recvfrom(ss, cast(void*)rcvMsgBuffer.ptr, cast(int)rcvMsgBuffer.length, 0, &msgSenderAdr, &msgSenderAdrSize);
+					//int msgLength = recvfrom(ss, cast(void*)rcvMsgBuffer.ptr, cast(int)rcvMsgBuffer.length, 0, &msgSenderAdr, &msgSenderAdrSize);
+					int msgLength = recv(opposingSocket, cast(void*)rcvMsgBuffer.ptr, cast(int)rcvMsgBuffer.length, 0);
 					
 					if (msgLength == SOCKET_ERROR)
 					{
@@ -730,8 +849,9 @@ void realtime() @nogc
 						return FAILURE;
 					}
 					
-					if ((cast(sockaddr_in) msgSenderAdr).sin_addr.s_addr == (cast(sockaddr_in)recievedSenderAddr).sin_addr.s_addr
-						&& rcvMsgBuffer[0] == 'c')
+					if (//(cast(sockaddr_in) msgSenderAdr).sin_addr.s_addr == (cast(sockaddr_in)recievedSenderAddr).sin_addr.s_addr
+						//&& 
+						rcvMsgBuffer[0] == 'c')
 					{
 						version(BigEndian)
 						{
@@ -761,6 +881,14 @@ void realtime() @nogc
 					printf("Server: Cannot close \\Server\\ socket. Error code: %ld\n", WSAGetLastError());
 				else
 					printf("Server: Closing \\Server\\ socket...\n");
+					
+				if (networkConnectSuccess == SUCCESS)
+				{
+					if(closesocket(opposingSocket) == SOCKET_ERROR)
+						printf("Server: Cannot close \\Opponent\\ socket. Error code: %ld\n", WSAGetLastError());
+					else
+						printf("Server: Closing \\Opponent\\ socket...\n");
+				}
 			
 				// When your application is finished call WSACleanup
 				if (WSACleanup() == SOCKET_ERROR)
@@ -1005,17 +1133,17 @@ greal arenaHalfwidth = 10.0;
 
 Fighter P1;
 Fighter P2;
-Fighter[2] Players;
+Fighter[NoPlayers] Players;
 const size_t FighterSize = __traits(classInstanceSize, Fighter);
-void[FighterSize*2] FighterData;
+void[FighterSize*NoPlayers] FighterData;
 
 debug
 @nogc
 {
 	import core.stdc.stdio;
 
-	ubyte[maxStateSerializationSize][2] serial;//For serialization testing
-	ubyte[2] serialInputs; //Stores input values;
+	ubyte[maxStateSerializationSize][NoPlayers] serial;//For serialization testing
+	ubyte[NoPlayers] serialInputs; //Stores input values;
 	const char* saveLocation = "./saves/savestate.save";
 	
 	size_t getStateSizeFromIndex(StateIndex stateindexNo)

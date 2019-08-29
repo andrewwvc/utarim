@@ -515,7 +515,7 @@ void realtime() @nogc
 	  
 	setupGame();
 	
-	//Initialize networkinG status variables;
+	//Initialize networking status variables;
 	const int UNUSED = -1;
 	const int SUCCESS = 0;
 	const int FAILURE = 1;
@@ -525,6 +525,7 @@ void realtime() @nogc
 	
 	
 	bool NetworkingCurrentlyEnabled = false;
+	bool currentFrameReceived = false;
 	
 	version (Windows)
 	{
@@ -644,6 +645,18 @@ void realtime() @nogc
 			return SUCCESS;
 		}
 		
+		int setSocketTimeoutValue(SOCKET sock, uint timeoutValue) @nogc
+		{
+			if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, cast(const(void)*) &timeoutValue, timeoutValue.sizeof) == SOCKET_ERROR)
+			{
+				printf("setsockopt failed with error: %d\n", WSAGetLastError());
+				
+				return FAILURE;
+			}
+			
+			return SUCCESS;
+		}
+		
 		//Accepts a null terminated string
 		int setupConnection(const char[] opponentIPstring) @nogc
 		{
@@ -680,9 +693,8 @@ void realtime() @nogc
 				return FAILURE;
 			}
 			
-			//Sets timeout value to 10 seconds
-			uint timeoutValue = 10000;
-			setsockopt(ss, SOL_SOCKET, SO_RCVTIMEO, cast(const(void)*) &timeoutValue, timeoutValue.sizeof);
+			//Sets timeout value for Server Socket to 10 seconds
+			setSocketTimeoutValue(ss, 10000);
 			
 			ubyte[512] msgBuffer;
 			
@@ -766,9 +778,8 @@ void realtime() @nogc
 				return FAILURE;
 			}
 			
-			//Sets timeout value to 1 second
-			timeoutValue = 1000;
-			setsockopt(opposingSocket , SOL_SOCKET, SO_RCVTIMEO, cast(const(void)*) &timeoutValue, timeoutValue.sizeof);
+			//Sets timeout value to 0.1 seconds
+			setSocketTimeoutValue(opposingSocket, 100);
 			
 			printf("Server: New opposing socket is OK!\n");
 			
@@ -783,21 +794,29 @@ void realtime() @nogc
 		int toggleNetworking() @nogc
 		{
 			NetworkingCurrentlyEnabled = !NetworkingCurrentlyEnabled;
+			
 			if (NetworkingCurrentlyEnabled)
 				printf("Networking enabled!\n");
 			else
 				printf("Networking disabled!\n");
 				
-			return SUCCESS;
+			
+		
+			if (networkConnectSuccess == SUCCESS)
+				return SUCCESS;
+				
+			printf("Network connection has not been established!\n");
+			
+			return FAILURE;
 		}
 		
-		int performNetworkSync() @nogc
+		const size_t bufferSize = 4;
+		
+		int performNetworkSyncSend() @nogc
 		{
-			if (networkStartSuccess == SUCCESS && networkConnectSuccess == SUCCESS && NetworkingCurrentlyEnabled)
+			if (networkConnectSuccess == SUCCESS && NetworkingCurrentlyEnabled)
 			{
-				const size_t bufferSize = 4;
 				ubyte[bufferSize] sendMsgBuffer;
-				ubyte[bufferSize] rcvMsgBuffer;
 				/*
 				[0] = 'c'
 				[1] = lower timestamp
@@ -806,7 +825,7 @@ void realtime() @nogc
 				*/
 				
 				size_t pIndex = cast(size_t) playerSide;
-				size_t oIndex = cast(size_t) !playerSide;
+				
 				
 				
 				//Signal character
@@ -824,23 +843,32 @@ void realtime() @nogc
 				{
 					sendMsgBuffer[3] = serializeControlInput(ci);
 				}
-				
-				//sendto(ss, cast(void*)sendMsgBuffer.ptr, sendMsgBuffer.sizeof, 0,
-				//&recievedSenderAddr, receivedSenderSize);
+
 				
 				if (send(opposingSocket, cast(void*)sendMsgBuffer.ptr, sendMsgBuffer.sizeof, 0) == SOCKET_ERROR)
 				{
 					printf("Sending failed! Error code: %ld.\n", WSAGetLastError());
 				}
-				
+			}
+		
+			return SUCCESS;
+		}
+		
+		int performNetworkSyncRecv() @nogc
+		{
+			if (networkConnectSuccess == SUCCESS && NetworkingCurrentlyEnabled)
+			{
 				SOCKADDR msgSenderAdr;
 				int msgSenderAdrSize = msgSenderAdr.sizeof;
+				
+				ubyte[bufferSize] rcvMsgBuffer;
+				
+				size_t oIndex = cast(size_t) !playerSide;
 				
 				bool loopFlag = true;
 				//Receive input
 				do
 				{
-					//int msgLength = recvfrom(ss, cast(void*)rcvMsgBuffer.ptr, cast(int)rcvMsgBuffer.length, 0, &msgSenderAdr, &msgSenderAdrSize);
 					int msgLength = recv(opposingSocket, cast(void*)rcvMsgBuffer.ptr, cast(int)rcvMsgBuffer.length, 0);
 					
 					if (msgLength == SOCKET_ERROR)
@@ -849,9 +877,7 @@ void realtime() @nogc
 						return FAILURE;
 					}
 					
-					if (//(cast(sockaddr_in) msgSenderAdr).sin_addr.s_addr == (cast(sockaddr_in)recievedSenderAddr).sin_addr.s_addr
-						//&& 
-						rcvMsgBuffer[0] == 'c')
+					if (rcvMsgBuffer[0] == 'c')
 					{
 						version(BigEndian)
 						{
@@ -866,10 +892,8 @@ void realtime() @nogc
 					}
 					
 				} while (true);
-				
-				//Deserialize input
 			}
-		
+			
 			return SUCCESS;
 		}
 		
@@ -924,9 +948,7 @@ void realtime() @nogc
       
 	//While application is running
 	while( !quit )
-	{
-	  //SDL_SetRenderDrawColor(gRenderer, 0x00, 0x00, 0x00, 0xFF);
-	  SDL_JoystickUpdate();
+	{ 
 	  //Handle events on queue
 	  while( SDL_PollEvent( &e ) != 0 )
 	  {
@@ -1049,18 +1071,21 @@ void realtime() @nogc
 	    
 	  }
 	  
-	  if (playerSide == LEFT)
-	  {
-		  setButtons(0, 0);
-		  setButtons(1, 1);
-	  }
-	  else
-	  {
-		setButtons(0, 1);
-		setButtons(1, 0);
-	  }
-	  
-	  performNetworkSync();
+		if (NetworkingCurrentlyEnabled == false)
+		{
+			SDL_JoystickUpdate();
+		
+			if (playerSide == LEFT)
+			{
+			  setButtons(0, 0);
+			  setButtons(1, 1);
+			}
+			else
+			{
+			setButtons(0, 1);
+			setButtons(1, 0);
+			}
+		}
 	  
 	  if (!paused)
 		gameUpdate();
@@ -1096,6 +1121,27 @@ void realtime() @nogc
 	  newTime = TickDuration.currSystemTick();
 	  dt = newTime - lastTime;
 	  
+	  //Networking currently changes the time that inpout events occur, allowing enough of a default delay so that the inputs can be transferred over the course of a frame
+	  if (NetworkingCurrentlyEnabled)
+	  {
+		SDL_JoystickUpdate();
+		
+		if (playerSide == LEFT)
+		{
+		  setButtons(0, 0);
+		  setButtons(1, 1);
+		}
+		else
+		{
+		setButtons(0, 1);
+		setButtons(1, 0);
+		}
+	  }
+	  
+	  frameCounter++;
+	  performNetworkSyncSend();
+	  currentFrameReceived = false;
+	  
 	  
 	  //Slows down framerate if time passes too quickly
 	  //Thread.sleep(dur!("nsecs")(nanoFrameDuration - dt.nsecs));
@@ -1104,6 +1150,8 @@ void realtime() @nogc
 		import core.sys.windows.winbase : Sleep;
 		Sleep(nanoFrameDuration/1000000);
 	  }
+	  
+	  performNetworkSyncRecv();
 	  
 	  //This is a basic loop that waits and holds the CPU until the time is ready for a new frame, ideally this should be changed to a sleep() function
 	  while (dt.nsecs < nanoFrameDuration)
@@ -1114,7 +1162,6 @@ void realtime() @nogc
 	  }
 	  
 	  lastTime = newTime;
-	  frameCounter++;
 	}
 	
 
@@ -1446,14 +1493,13 @@ class Fighter
 			glEnd();
 		  glPopMatrix();
 		}
-		else
-		{
-			glPushMatrix();
-				glTranslatef(cast(float)x, cast(float)y, 0.0f);
-				glRotatef(90.0*state.facing, 0.0, 1.0, 0.0);
-				drawFighter(state);
-			glPopMatrix();
-		}
+
+		glPushMatrix();
+			glTranslatef(cast(float)x, cast(float)y, 0.0f);
+			glRotatef(90.0*state.facing, 0.0, 1.0, 0.0);
+			drawFighter(state);
+		glPopMatrix();
+
 		 
 		 
 	  }

@@ -737,7 +737,7 @@ void realtime() @nogc
 		 
 			if (msgLength == SOCKET_ERROR)
 			{
-				printf("Server: recvfrom() failed! Error code: %ld.\n", WSAGetLastError());
+				printf("Server: recvfrom() failed! No Hello! Error code: %ld.\n", WSAGetLastError());
 				return FAILURE;
 			}
 			
@@ -752,6 +752,19 @@ void realtime() @nogc
 				printf("Handshake failed. Opponent did not say Hello!\n");
 				return FAILURE;
 			}
+			
+			with ((cast(sockaddr_in)recievedSenderAddr).sin_addr.S_un.S_un_b)
+			{
+				sendBuff[0] = 'A';
+				sendBuff[1] = 'l';
+				sendBuff[2] = 'o';
+				sendBuff[3] = 'h';
+				sendBuff[4] = 'a';
+				sendBuff[5] = s_b1;
+				sendBuff[6] = s_b2;
+				sendBuff[7] = s_b3;
+				sendBuff[8] = s_b4;
+			}
 
 			sendto(ss, cast(void*)sendBuff.ptr, sendBuff.sizeof, 0,
 				&recievedSenderAddr, receivedSenderSize);
@@ -762,6 +775,43 @@ void realtime() @nogc
 			with ((cast(sockaddr_in)recievedSenderAddr).sin_addr.S_un.S_un_b)
 			{			
 				printf("Opponent IP set to : %i.%i.%i.%i\n", s_b1, s_b2, s_b3, s_b4);
+			}
+			
+			msgLength = recvfrom(ss, cast(void*)msgBuffer.ptr, cast(int)msgBuffer.length - 1, 0, &recievedSenderAddr, &receivedSenderSize);
+		 
+			if (msgLength == SOCKET_ERROR)
+			{
+				printf("Server: recvfrom() failed! No Aloha! Error code: %ld.\n", WSAGetLastError());
+				return FAILURE;
+			}
+			
+			msgBuffer[msgBuffer.length-1] = '\0';
+			
+			printf("Message: %s\n", cast(char*)msgBuffer.ptr);
+			
+			char[5] aloha = ['A', 'l', 'o', 'h', 'a'];
+			
+			if (msgBuffer[0..5] !=  aloha)
+			{
+				printf("Handshake failed. Opponent did not say Aloha!\n");
+				return FAILURE;
+			}
+			
+			SOCKADDR_IN connectedRecvAddr;
+			
+			// The IPv4 family
+			connectedRecvAddr.sin_family = AF_INET;
+			// host-to-network byte order
+			connectedRecvAddr.sin_port = htons(port);
+			// Listen on all interface, host-to-network byte order
+			connectedRecvAddr.sin_addr.S_un.S_un_b.s_b1 = msgBuffer[5];
+			connectedRecvAddr.sin_addr.S_un.S_un_b.s_b2 = msgBuffer[6];
+			connectedRecvAddr.sin_addr.S_un.S_un_b.s_b3 = msgBuffer[7];
+			connectedRecvAddr.sin_addr.S_un.S_un_b.s_b4 = msgBuffer[8];
+			
+			with ((cast(sockaddr_in)connectedRecvAddr).sin_addr.S_un.S_un_b)
+			{			
+				printf("Connected receiving IP set to : %i.%i.%i.%i\n", s_b1, s_b2, s_b3, s_b4);
 			}
 			
 			//Setup new connected Socket
@@ -788,7 +838,7 @@ void realtime() @nogc
 			}
 			
 			//We have to bind() anyway because of how Winsock works
-			if (bind(opposingSocket, &recievedSenderAddr,  receivedSenderSize) == SOCKET_ERROR)
+			if (bind(opposingSocket, cast(SOCKADDR *) &connectedRecvAddr,  connectedRecvAddr.sizeof) == SOCKET_ERROR)
 			{
 				printf("Bind failed! Error code: %ld.\n", WSAGetLastError());
 			

@@ -191,50 +191,82 @@ Animation[4] animations;
 
 const size_t totalOfStoredFrames = 10;
 
+
 struct GameFrame
 {
 	ubyte[maxStateSerializationSize][NoPlayers] fStates;
-	ubyte[NoPlayers][totalOfStoredFrames] fInputs;
+	InputSerialization[NoPlayers] fInputs;
 }
 
-// struct GameFrameQueue
-// {
-	// byte currentFrameIndex = totalOfStoredFrames-1;
-	// byte noStored = 0;
-	// ubyte[maxStateSerializationSize][NoPlayers][totalOfStoredFrames] frameState;
-	// ubyte[NoPlayers][totalOfStoredFrames] frameInput;
+struct GameFrameQueue
+{
+	byte currentFrameIndex;
+	byte noStored;
+	ubyte[maxStateSerializationSize][NoPlayers][totalOfStoredFrames] frameState;
+	InputSerialization[NoPlayers][totalOfStoredFrames] frameInput;
 	
-	// void insertFrame(ref Fighter[NoPlayers] fighters)
-	// {
-		// currentFrameIndex = (currentFrameIndex + 1) % totalOfStoredFrames;
+	this(bool filler) @nogc
+	{
+		fullReset();
+	}
+	
+	void insertFrame(ref Fighter[NoPlayers] fighters) @nogc
+	{
+		if (noStored < totalOfStoredFrames)
+			noStored++;
 		
-		// if (noStored < totalOfStoredFrames)
-			// noStored++;
+		foreach(ii, fighter; fighters)
+		{
+			fighter.state.serializeState(frameState[currentFrameIndex][ii]);
+			frameInput[currentFrameIndex][ii] = serializeControlInput(fighter.ci);
+		}
 		
-		// foreach(ii, fighter; fighters)
-		// {
-			// fighter.state.serializeState(frameState[currentFrameIndex][ii]);
-			// frameInput[currentFrameIndex][ii] = serializeControlInput(fighter.ci);
-		// }
-	// }
+		currentFrameIndex = (currentFrameIndex + 1) % totalOfStoredFrames;
+	}
 	
 
-	// ref GameFrame retriveMinusNthFrame(int nn)
-	// {
-		// if (nn >= noStored)
-			// return null;
-			
-		// return null;
-	// }
+	void retriveMinusNthFrame(uint nn, ref GameFrame gf) @nogc
+	{
+		//assert(0 < nn && nn <= noStored);
+		
+		size_t index = (currentFrameIndex - nn) %  totalOfStoredFrames;
+		
+		gf.fStates[0] = frameState[index][0];
+		gf.fStates[1] = frameState[index][1];
+		
+		gf.fInputs[0] = frameInput[index][0];
+		gf.fInputs[1] = frameInput[index][1];
+	}
 	
-	// //Reduces the noStored to 0, without overwirting elements unnecessarily
-	// void softReset()
-	// {
-		// noStored = 0;
-	// }
+	InputSerialization retriveMinusNthInputForPlayer(uint nn, size_t pNo) @nogc
+	{
+		//assert(0 < nn && nn <= noStored);
+		
+		size_t index = (currentFrameIndex - nn) %  totalOfStoredFrames;
+		
+		return frameInput[index][pNo];
+	}
 	
+	//Reduces the noStored to 0, without overwirting elements unnecessarily
+	void softReset() @nogc
+	{
+		noStored = 0;
+	}
 	
-// }
+	void fullReset() @nogc
+	{
+		Idle example = makeState!Idle();
+		
+		foreach (frame; frameState)
+		{
+			example.serializeState(frame[0]);
+			example.serializeState(frame[1]);
+		}
+		
+		currentFrameIndex = 0;
+		noStored = 0;
+	}
+}
 
 debug
 void dynamicPrint(string st) @nogc
@@ -514,6 +546,8 @@ void realtime() @nogc
 	  takedownControllers();
 	  
 	setupGame();
+	
+	GameFrameQueue gfq = GameFrameQueue(true);
 	
 	//Initialize networking status variables;
 	const int UNUSED = -1;
@@ -810,7 +844,8 @@ void realtime() @nogc
 			return FAILURE;
 		}
 		
-		const size_t bufferSize = 4;
+		const size_t inputWindowLength = 3;
+		const size_t bufferSize = 3 + inputWindowLength*InputSerialization.sizeof;
 		
 		int performNetworkSyncSend() @nogc
 		{
@@ -821,7 +856,9 @@ void realtime() @nogc
 				[0] = 'c'
 				[1] = lower timestamp
 				[2] = upper timestamp
-				[3] = control inputs
+				[3] = control inputs 0
+				[4] = control inputs 1
+				[5] = control inputs 2
 				*/
 				
 				size_t pIndex = cast(size_t) playerSide;
@@ -842,6 +879,8 @@ void realtime() @nogc
 				with (Players[pIndex])
 				{
 					sendMsgBuffer[3] = serializeControlInput(ci);
+					sendMsgBuffer[4] = gfq.retriveMinusNthInputForPlayer(1, pIndex);
+					sendMsgBuffer[5] = gfq.retriveMinusNthInputForPlayer(2, pIndex);
 				}
 
 				
@@ -865,9 +904,8 @@ void realtime() @nogc
 				
 				size_t oIndex = cast(size_t) !playerSide;
 				
-				bool loopFlag = true;
 				//Receive input
-				do
+				while (!currentFrameReceived)
 				{
 					int msgLength = recv(opposingSocket, cast(void*)rcvMsgBuffer.ptr, cast(int)rcvMsgBuffer.length, 0);
 					
@@ -884,14 +922,28 @@ void realtime() @nogc
 							reverse(rcvMsgBuffer[1..3]);
 						}
 						FrameNo[1] rcvFrameCounter  = cast(FrameNo[1]) rcvMsgBuffer[1..3];
-						if (rcvFrameCounter[0] == frameCounter)
+						FrameNo rcvFrameNo = rcvFrameCounter[0];
+						
+						if (rcvFrameNo == frameCounter)
 						{
 							deserializeControlInput(rcvMsgBuffer[3], Players[oIndex].ci);
+							currentFrameReceived = true;
 							break;
+						}
+						else if (rcvFrameNo > frameCounter)
+						{
+							int frameDiff = rcvFrameNo - frameCounter;
+							
+							if (frameDiff == 1)
+							{
+								deserializeControlInput(rcvMsgBuffer[4], Players[oIndex].ci);
+								currentFrameReceived = true;
+								break;
+							}
 						}
 					}
 					
-				} while (true);
+				}
 			}
 			
 			return SUCCESS;
@@ -948,7 +1000,81 @@ void realtime() @nogc
       
 	//While application is running
 	while( !quit )
-	{ 
+	{
+		//Networking currently changes the time that inpout events occur, allowing enough of a default delay so that the inputs can be transferred over the course of a frame
+	  if (NetworkingCurrentlyEnabled)
+	  {
+		//Time update
+		  newTime = TickDuration.currSystemTick();
+		  dt = newTime - lastTime;
+	  
+		SDL_JoystickUpdate();
+		
+		if (playerSide == LEFT)
+		{
+		  setButtons(0, 0);
+		  setButtons(1, 1);
+		}
+		else
+		{
+		setButtons(0, 1);
+		setButtons(1, 0);
+		}
+		
+		if (networkConnectSuccess == SUCCESS)
+		{
+		  const int noOfReRecvs = 3;
+		  performNetworkSyncSend();
+		  currentFrameReceived = false;
+		  
+		  //Sets timeout value to 0.001 seconds
+		  setSocketTimeoutValue(opposingSocket, 0);
+		  
+		  for (int ii = 0; ii < noOfReRecvs - 1; ++ii)
+		  {
+			  //Slows down framerate if time passes too quickly
+			  version (Windows)
+			  {
+				import core.sys.windows.winbase : Sleep;
+				Sleep((nanoFrameDuration/1000000)/noOfReRecvs);//NOTE: Account for the extra time used for recv!
+			  }
+			  
+			  performNetworkSyncSend();
+			  performNetworkSyncRecv();
+		  }
+		  
+		  //Sets timeout value to 0.1 seconds
+		  setSocketTimeoutValue(opposingSocket, 100);
+		  
+		  //Slows down framerate if time passes too quickly
+		  version (Windows)
+		  {
+			import core.sys.windows.winbase : Sleep;
+			Sleep((nanoFrameDuration/1000000)/noOfReRecvs);
+		  }
+		  
+		  performNetworkSyncRecv();
+		}
+		else
+		{
+			version (Windows)
+			{
+				import core.sys.windows.winbase : Sleep;
+				Sleep((nanoFrameDuration/1000000));
+			}
+		}
+		  
+		//BUSY WAIT SECTION
+		while (dt.nsecs < nanoFrameDuration)
+		{
+
+		newTime = TickDuration.currSystemTick();
+		dt = newTime - lastTime;
+		}
+
+		lastTime = newTime;
+	  }
+	
 	  //Handle events on queue
 	  while( SDL_PollEvent( &e ) != 0 )
 	  {
@@ -1071,6 +1197,7 @@ void realtime() @nogc
 	    
 	  }
 	  
+	  //Input updating occurs right before the game update if networking is not occuring
 		if (NetworkingCurrentlyEnabled == false)
 		{
 			SDL_JoystickUpdate();
@@ -1089,79 +1216,69 @@ void realtime() @nogc
 	  
 	  if (!paused)
 		gameUpdate();
-	  
-	  //Clear color buffer
-	  glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	  glMatrixMode(GL_MODELVIEW);
-	  
-	  //mProgram.useFixed();
-	  glUseProgram(0);
-	  
-	  //Setup Lighting
-	  glEnable(GL_LIGHTING);
-	  
-	  const static float[] ambientLight = [0.2f, 0.2f, 0.2f, 1.0f];
-	  const static float[] diffuseLight = [0.8f, 0.8f, 0.8f, 1.0f];
-	  const static float[] positionLight = [0.0f, 0.0f, 0.0f, 1.0f];
-	  
-	  glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight.ptr);
-	  glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight.ptr);
-	  glLightfv(GL_LIGHT0, GL_POSITION, positionLight.ptr);
-	  
-	  glEnable(GL_LIGHT0);
-	  
-	  glColorMaterial ( GL_FRONT, GL_DIFFUSE);
-	  glEnable (GL_COLOR_MATERIAL);
-	  
-	  renderFighters();
-	  
-	  SDL_GL_SwapWindow( gWindow );
-	  
-	  //Time update
-	  newTime = TickDuration.currSystemTick();
-	  dt = newTime - lastTime;
-	  
-	  //Networking currently changes the time that inpout events occur, allowing enough of a default delay so that the inputs can be transferred over the course of a frame
-	  if (NetworkingCurrentlyEnabled)
-	  {
-		SDL_JoystickUpdate();
 		
-		if (playerSide == LEFT)
+		void drawGraphics() @nogc
 		{
-		  setButtons(0, 0);
-		  setButtons(1, 1);
+			//Clear color buffer
+		  glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		  glMatrixMode(GL_MODELVIEW);
+		  
+		  //mProgram.useFixed();
+		  glUseProgram(0);
+		  
+		  //Setup Lighting
+		  glEnable(GL_LIGHTING);
+		  
+		  const static float[] ambientLight = [0.2f, 0.2f, 0.2f, 1.0f];
+		  const static float[] diffuseLight = [0.8f, 0.8f, 0.8f, 1.0f];
+		  const static float[] positionLight = [0.0f, 0.0f, 0.0f, 1.0f];
+		  
+		  glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight.ptr);
+		  glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight.ptr);
+		  glLightfv(GL_LIGHT0, GL_POSITION, positionLight.ptr);
+		  
+		  glEnable(GL_LIGHT0);
+		  
+		  glColorMaterial ( GL_FRONT, GL_DIFFUSE);
+		  glEnable (GL_COLOR_MATERIAL);
+		  
+		  renderFighters();
+		  
+		  SDL_GL_SwapWindow( gWindow );
 		}
-		else
-		{
-		setButtons(0, 1);
-		setButtons(1, 0);
-		}
-	  }
 	  
+	  drawGraphics();
+	  
+	  //Increase frame counter after frame is displayed
 	  frameCounter++;
-	  performNetworkSyncSend();
-	  currentFrameReceived = false;
+	  
+	  gfq.insertFrame(Players);
 	  
 	  
-	  //Slows down framerate if time passes too quickly
-	  //Thread.sleep(dur!("nsecs")(nanoFrameDuration - dt.nsecs));
-	  version (Windows)
+	  if (NetworkingCurrentlyEnabled == false)
 	  {
-		import core.sys.windows.winbase : Sleep;
-		Sleep(nanoFrameDuration/1000000);
+		//Time update
+		  newTime = TickDuration.currSystemTick();
+		  dt = newTime - lastTime;
+	  
+		  version (Windows)
+		  {
+			import core.sys.windows.winbase : Sleep;
+			Sleep((nanoFrameDuration/1000000));
+		  }
+		  
+		  //This is a basic loop that waits and holds the CPU until the time is ready for a new frame, ideally this should be changed to a sleep() function
+		  //This section should be timed to see how close it comes to taking zero time 
+		  //BUSY WAIT SECTION
+		  while (dt.nsecs < nanoFrameDuration)
+		  {
+			
+			newTime = TickDuration.currSystemTick();
+			dt = newTime - lastTime;
+		  }
+		  
+		  lastTime = newTime;
 	  }
-	  
-	  performNetworkSyncRecv();
-	  
-	  //This is a basic loop that waits and holds the CPU until the time is ready for a new frame, ideally this should be changed to a sleep() function
-	  while (dt.nsecs < nanoFrameDuration)
-	  {
-		
-		newTime = TickDuration.currSystemTick();
-		dt = newTime - lastTime;
-	  }
-	  
-	  lastTime = newTime;
 	}
 	
 
@@ -1190,7 +1307,7 @@ debug
 	import core.stdc.stdio;
 
 	ubyte[maxStateSerializationSize][NoPlayers] serial;//For serialization testing
-	ubyte[NoPlayers] serialInputs; //Stores input values;
+	InputSerialization[NoPlayers] serialInputs; //Stores input values;
 	const char* saveLocation = "./saves/savestate.save";
 	
 	size_t getStateSizeFromIndex(StateIndex stateindexNo)
@@ -1249,7 +1366,7 @@ debug
 		fp = fopen(saveLocation, "w+");
 		//fputs("save stuff here hey\n", fp);
 		
-		fwrite(serialInputs.ptr, ubyte.sizeof, 2, fp);
+		fwrite(serialInputs.ptr, InputSerialization.sizeof, 2, fp);
 		writeState(fp, serial[0]);
 		writeState(fp, serial[1]);
 		
@@ -1342,7 +1459,9 @@ struct ControlInput
   bool[4] buttons;
 }
 
-ubyte serializeControlInput(ref ControlInput cInput) @nogc
+alias InputSerialization = ubyte;
+
+InputSerialization serializeControlInput(ref ControlInput cInput) @nogc
 {
 	with (cInput)
 	{
@@ -1353,7 +1472,7 @@ ubyte serializeControlInput(ref ControlInput cInput) @nogc
 	}
 }
 
-void deserializeControlInput(ubyte inByte, ref ControlInput cInputOut) @nogc
+void deserializeControlInput(InputSerialization inByte, ref ControlInput cInputOut) @nogc
 {
 	with (cInputOut)
 	{

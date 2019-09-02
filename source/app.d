@@ -787,8 +787,6 @@ void realtime() @nogc
 			
 			msgBuffer[msgBuffer.length-1] = '\0';
 			
-			printf("Message: %s\n", cast(char*)msgBuffer.ptr);
-			
 			char[5] aloha = ['A', 'l', 'o', 'h', 'a'];
 			
 			if (msgBuffer[0..5] !=  aloha)
@@ -863,7 +861,7 @@ void realtime() @nogc
 			}
 			
 			//Sets timeout value to 0.1 seconds
-			setSocketTimeoutValue(opposingSocket, 100);
+			setSocketTimeoutValue(opposingSocket, 1000);
 			
 			printf("Server: New opposing socket is OK!\n");
 			
@@ -1078,7 +1076,7 @@ void realtime() @nogc
 		  currentFrameReceived = false;
 		  
 		  //Sets timeout value to 0.001 seconds
-		  setSocketTimeoutValue(opposingSocket, 0);
+		  setSocketTimeoutValue(opposingSocket, 1);
 		  
 		  for (int ii = 0; ii < noOfReRecvs - 1; ++ii)
 		  {
@@ -1090,11 +1088,12 @@ void realtime() @nogc
 			  }
 			  
 			  performNetworkSyncSend();
-			  performNetworkSyncRecv();
+			  if (performNetworkSyncRecv() == FAILURE)
+				printf("Mini-sync failed.\n");
 		  }
 		  
 		  //Sets timeout value to 0.1 seconds
-		  setSocketTimeoutValue(opposingSocket, 100);
+		  setSocketTimeoutValue(opposingSocket, 1000);
 		  
 		  //Slows down framerate if time passes too quickly
 		  version (Windows)
@@ -1103,7 +1102,8 @@ void realtime() @nogc
 			Sleep((nanoFrameDuration/1000000)/noOfReRecvs);
 		  }
 		  
-		  performNetworkSyncRecv();
+		  if (performNetworkSyncRecv() == FAILURE)
+				printf("Major-sync failed.\n");
 		}
 		else
 		{

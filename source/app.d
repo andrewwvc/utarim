@@ -576,7 +576,8 @@ void realtime() @nogc
 		int receivedSenderSize = SOCKADDR.sizeof;
 		ushort opposingPort = 49970;
 		
-		
+		//Default connection
+		uint defConnectionIP = inet_addr("127.0.0.1");
 			
 	
 		int startNetworking() @nogc
@@ -690,6 +691,7 @@ void realtime() @nogc
 			
 			return SUCCESS;
 		}
+		 
 		
 		//Accepts a null terminated string
 		int setupConnection(const char[] opponentIPstring) @nogc
@@ -714,9 +716,14 @@ void realtime() @nogc
 			sendAddr.sin_port = htons(port);
 			// Listen on all interface, host-to-network byte order
 			if (opponentIPstring[0] == '\0' || opponentIPstring[0] == '\n')
-				sendAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+			{
+				sendAddr.sin_addr.s_addr = defConnectionIP;
+			}
 			else
-				sendAddr.sin_addr.s_addr = inet_addr(opponentIPstring.ptr);
+			{
+				defConnectionIP = inet_addr(opponentIPstring.ptr)
+				sendAddr.sin_addr.s_addr = defConnectionIP;
+			}
 			
 			ubyte[16] sendBuff = cast(ubyte[16]) "Hello, how are u";//[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
 			
@@ -743,7 +750,7 @@ void realtime() @nogc
 			
 			msgBuffer[msgBuffer.length-1] = '\0';
 				
-			printf("Message: %s\n", cast(char*)msgBuffer.ptr);
+			  ("Message: %s\n", cast(char*)msgBuffer.ptr);
 			
 			char[5] hello = ['H', 'e', 'l', 'l', 'o'];
 			
@@ -1147,7 +1154,7 @@ void realtime() @nogc
 			
 			//Recieve command input from the console
 			case SDLK_c:
-			printf("Console:\n");
+			printf("Enter connection IP:\n");
 			
 			import core.stdc.stdio;
 			

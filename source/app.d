@@ -721,7 +721,7 @@ void realtime() @nogc
 			}
 			else
 			{
-				defConnectionIP = inet_addr(opponentIPstring.ptr)
+				defConnectionIP = inet_addr(opponentIPstring.ptr);
 				sendAddr.sin_addr.s_addr = defConnectionIP;
 			}
 			
@@ -750,7 +750,7 @@ void realtime() @nogc
 			
 			msgBuffer[msgBuffer.length-1] = '\0';
 				
-			  ("Message: %s\n", cast(char*)msgBuffer.ptr);
+			printf("Message: %s\n", cast(char*)msgBuffer.ptr);
 			
 			char[5] hello = ['H', 'e', 'l', 'l', 'o'];
 			
@@ -1490,9 +1490,26 @@ void renderFighters() @nogc
 	glPopMatrix();
 }
 
-void collisions(Fighter first, Fighter second) @nogc
+void collisions(State agent, State patient) @nogc
 {
+	if (agent.extended)
+	{
+		if (patient.parry)
+		{
+		}
+		else if (agent.attack)
+		{
+		}
+	}
+	else if (agent.parry)
+	{
+	}
+	else //Neutral case
+	{
+		//Handle possible blocking
+	}
 }
+
 
 void gameUpdate() @nogc
 {
@@ -1763,6 +1780,23 @@ void breakState(State state)
   }
 }
 
+@nogc
+void transferState(S1, S2)(S1 agent, S2 patient) 
+{
+	transferTensions(agent, patient);
+	
+	static if (is(S1 : AnimatedState) && is(S2 : AnimatedState))
+	{
+		patient.toBlendIndex = agent.anim;
+	}
+}
+
+@nogc
+void transferTensions(State agent, State patient)
+{
+	patient.tensionList = agent.tensionList;
+}
+
 //dynamicType = staticIndexOf!(typeof(this), StateList);
 @nogc
 size_t serializationHeaderSize(T)()
@@ -1884,6 +1918,11 @@ State deserializeState(ref ubyte[maxStateSerializationSize] input) @nogc
 	}
 }
 
+struct BufferedState
+{
+	StateIndex si;
+}
+
 abstract class State
 {
   this() @nogc
@@ -1892,14 +1931,21 @@ abstract class State
   this(greal X, greal Y, HorizontalDir faceDirection) @nogc
   {x = X; y = Y; facing = faceDirection;}
   
-  @("noser")
-  {
+
   //Construct bools
-  bool animatedState = false;
-  bool attackState = false;
-  //Use the .offset property in order to store the pointer offset for each individual State and cast this to the AttackSubstate
-  bool defenceState = false;
-  }
+  // bool animatedState = false;
+  // bool attackState = false;
+  // //Use the .offset property in order to store the pointer offset for each individual State and cast this to the AttackSubstate
+  // bool defenceState = false;
+  
+	int index() @nogc {return 0;} 
+	bool parry() @nogc {return false;}
+	bool attack() @nogc {return false;}
+	bool extended() @nogc {return false;}
+	bool blocking() @nogc {return false;}
+	
+	int[5] tensionList;
+
   
   //~this() @nogc;
   
@@ -1908,6 +1954,8 @@ abstract class State
   public HorizontalDir facing;
   // public alias x = pos.x;
   // public alias y = pos.y;
+  
+  BufferedState buffState;
   
   	@property @nogc {
 		vreal x(vreal V) 
@@ -1954,12 +2002,24 @@ abstract class State
 	void serializeState(ubyte[] buffer) @nogc;
   
     State makeUpdate(Fighter parent) @nogc;
+	
+	State createNewState(S, Args...)(auto ref Args args) @nogc
+	{	
+		S ss = makeState!(S)(args);
+		transferState(this, ss);
+		return ss;
+	}
 }
 
 abstract class AnimatedState : State
 {
 	AnimationIndex anim;
-	Animation* toBlendAnim = null;
+	AnimationIndex toBlendIndex = 0;
+	//Animation* toBlendAnim = null;
+	Animation* toBlendAnim() @nogc
+	{
+		return null; //&animations[toBlendIndex];
+	}
 	
 	int timeFrame = 0;
 	int timeFrame2 = 0;
@@ -1984,7 +2044,7 @@ abstract class AnimatedState : State
 	override void animateState(Fighter parent) @nogc
 	{
 		if (toBlendAnim == null)
-			drawSkeletonMesh(parent.skel, *getAnim(), timeFrame, true);
+			drawSkeletonMesh(parent.skel, *getAnim(), timeFrame, true);  
 		else
 			drawSkeletonMeshInterpolated(parent.skel, *getAnim(), *toBlendAnim, timeFrame, timeFrame2, ivalue, true);
 	}
@@ -1993,20 +2053,22 @@ abstract class AnimatedState : State
 
 struct AttackSubstate
 {
-	struct AttackBox
+	struct AttackSphere
 	{
-		greal x, y, length, height;
+		greal x, y, radius;
 		bool active = false;
 	}
 	
-	ref AttackBox[10] attacks();
+	ref AttackSphere[10] attacks();
 }
 
 mixin template AttackMix()
 {
 	AttackSubstate attacks;
 	
-	 bool attackState = true;
+	bool attack() {return true;}
+	
+	 //bool attackState = true;
 }
 
 mixin template serializableState()
@@ -2047,7 +2109,8 @@ class Idle : AnimatedState
 			return makeState!Idle(movePosition(parent, x+horiDir*(VerticalDir.down == vertDir ? 0.04 : 0.1), y).x, y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
 		}
 		else
-		  return makeState!Idle(x,y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
+		  //return makeState!Idle(x,y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
+		  return createNewState!(Idle)(x,y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
 	}
   }
   

@@ -2294,7 +2294,12 @@ class Idle : AnimatedState
 	{
 		//debug printf("Idle\n");
 		if (buttons[0])
-		  return createNewState!Duck(x,y, facing);
+		{
+			Duck ss = createNewState!Duck();
+			duck.x = x;
+			duck.facing = facing;
+			return ss;
+		}
 		else if (buttons[2])
 			return createNewState!Kick(x,y, facing);
 		else if (horiDir != HorizontalDir.neutral)

@@ -692,7 +692,7 @@ void drawSkeletonMeshInterpolated(ref Skeleton skel, ref Animation anim1, ref An
 }
 
 
-bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GLMatrix posMat, ref Sphere3[] balls) @nogc
+bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GLMatrix posMat, Sphere3[] balls) @nogc
 {
     bool testBone(int index, Quat[] f, Quat[] g, vreal interpolation, ref GLMatrix newMat) @nogc
     {

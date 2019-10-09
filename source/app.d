@@ -1490,23 +1490,176 @@ void renderFighters() @nogc
 	glPopMatrix();
 }
 
-void collisions(State agent, State patient) @nogc
+void corpseToCorpse(Fighter firstF, State firstS, Fighter secondF, State secondS) @nogc
 {
+	greal DefaultPushBack = 0.2;
+	greal pushBackVal = 0.0;
+	
+	if (firstS.x + firstF.halfWidth > secondS.x - secondF.halfWidth
+		&& secondS.x + secondF.halfWidth > firstS.x - firstF.halfWidth)
+	{	
+		if (firstS.x < secondS.x)
+		{
+			pushBackVal = 1.0;
+		}
+		else
+		{
+			pushBackVal = -1.0;
+		}
+		
+		if (std.math.abs(firstS.x - secondS.x) + DefaultPushBack*2.0 > firstF.halfWidth + secondF.halfWidth)
+		{
+			DefaultPushBack = ((firstF.halfWidth + secondF.halfWidth) - std.math.abs(firstS.x - secondS.x))*0.5;
+		}
+		
+		firstS.pos = firstS.movePosition(firstF, firstS.x - pushBackVal*DefaultPushBack, firstS.y);
+		secondS.pos = secondS.movePosition(secondF, secondS.x + pushBackVal*DefaultPushBack, secondS.y);
+	}
+}
+
+void collisions(Fighter agent, Fighter patient) @nogc
+{
+	//The hit override states allow a temoprary set of states to be created
+	//Multiple hits may cause a hit state to accumulate. Because of this, there must be a way of 'adding to' hit states which shoud be associative and comutative
+	//This should replace the tempState that would otherwise exist, destroying it. However, if the state has 'armour' then it may resist the hit transfer, meaning that the HitOverride shoudl be deleted instead.
+	State agentHitOverride = null;
+	State patientHitOverride = null;
+
 	if (agent.extended)
 	{
 		if (patient.parry)
 		{
+			if(/*Did parry*/ false)
+			{
+				return;
+			}
 		}
-		else if (agent.attack)
+		
+		
+		if (agent.attack)
 		{
+			AttackSphere[HITBOX_NO] as;
+			Sphere3[HITBOX_NO] spheres;
+			Animation* patientBody;
+			real patientFrame;
+			
+			static GLMatrix IDENTITY = [1,0,0,0, 0,1,0,1, 0,0,1,0, 0,0,0,1];
+			
+			agent.attacks(as);
+			patient.bodyBox(&patientBody, &patientFrame);
+			
+			int jj = 0;
+			
+			for (int ii = 0; ii < HITBOX_NO; ++ii)
+			{
+				if (as[ii].active)
+				{
+					with (spheres[jj])
+					{
+						radius = as[ii].radius;
+						point.x = as[ii].x;
+						point.y = as[ii].y;
+					}
+					
+					++jj;
+				}
+			}
+			
+			bool hit = testSkeletonBall(patient.skel, *patientBody, patientFrame, IDENTITY, spheres[0..jj]);
+		
+			if (!hit)
+			{
+				if (/*P extended*/ false)
+				{
+					if (patient.attack)
+					{
+						if(/*check for clashes*/false)
+						{
+							//return if clashing and attacks don't override each other
+							return;
+						}
+					}
+				
+					//check if extention is hit by attack 
+				}
+			}
+			else
+			{
+				//If hit occured, update hit override
+				
+				if (!patientHitOverride)
+				{
+					with (patient)
+					{
+						patientHitOverride = makeState!(Dumb)(x, y, facing);
+					}
+				}				
+				
+			}
+			
 		}
 	}
-	else if (agent.parry)
+	
+	if (patient.extended)
 	{
+		if (agent.parry)
+		{
+			if(/*Did parry*/ false)
+			{
+				return;
+			}
+		}
+		
+		
+		if (patient.attack)
+		{
+			if (/*A not hit*/ false)
+			{
+				if (/*A extended*/ false)
+				{
+				
+					//check if extention is hit by attack 
+				}
+			}
+			else
+			{
+				//If hit occured, update hit override
+			}
+		}
 	}
-	else //Neutral case
+	
+	if (!agent.extended && !patient.extended )
 	{
-		//Handle possible blocking
+	
+		if (agent.parry && patient.parry)
+		{
+			//Check for parry clash
+		}
+		else //Neutral case
+		{
+			//Handle possible blocking
+			agent.insertTempUpdate(copyState(agent));
+			patient.insertTempUpdate(copyState(patient));
+			
+			return;
+		}
+	}
+	
+	damage_override_part:
+	
+	void damageOverride(State current, State damaged) @nogc
+	{
+		
+	}
+	
+	if (agentHitOverride)
+	{
+		damageOverride(agent.tempState, agentHitOverride);
+	}
+	
+	if (patientHitOverride)
+	{
+		damageOverride(patient.tempState, agentHitOverride);
 	}
 }
 
@@ -1518,7 +1671,10 @@ void gameUpdate() @nogc
   P2.createUpdate();
   P1.swapUpdate();
   P2.swapUpdate();
+  corpseToCorpse(P1,P1, P2, P2);
   collisions(P1, P2); //Creates new update set to swap
+  P1.swapUpdate();
+  P2.swapUpdate();
 }
 
 enum VerticalDir {neutral = 0, up = 1, down = -1};
@@ -1640,6 +1796,12 @@ class Fighter
 	//     void update(State s) {}
 	//   }
 	  
+	  void insertTempUpdate(State update)
+	  {
+		if (tempState) breakState(tempState);
+			tempState = update;
+	  }
+	  
 	  void createUpdate()
 	  {
 		if (tempState) breakState(tempState);
@@ -1707,13 +1869,13 @@ class Fighter
   protected State state;
   protected State tempState;
   public Skeleton skel;
-  public greal halfWidth = 1.0;
+  public greal halfWidth = 0.5;
   alias state this;
   
 }
 
 //This should list all non-abstract subclasses of State
-alias StateList = AliasSeq!(Idle, Step, Duck, Kick);
+alias StateList = AliasSeq!(Idle, Duck, Dumb, Kick);
 
 pure size_t maxStateSizeCalc()
 {
@@ -1783,6 +1945,8 @@ void breakState(State state)
 @nogc
 void transferState(S1, S2)(S1 agent, S2 patient) 
 {
+	patient.damage = agent.damage;
+	
 	transferTensions(agent, patient);
 	
 	static if (is(S1 : AnimatedState) && is(S2 : AnimatedState))
@@ -1825,6 +1989,15 @@ The 'deserialize' functions correspond to the serialization ones.
 deserializeState: implicitly requires a buffer of size maxStateSerializationSize to be passed to it.
 
 **/
+
+@nogc
+State copyState(State state)
+{
+	ubyte[maxStateSerializationSize] buffer;
+	
+	state.serializeState(buffer);
+	return deserializeState(buffer);
+}
 
 
 @nogc
@@ -1923,6 +2096,9 @@ struct BufferedState
 	StateIndex si;
 }
 
+const int HITBOX_NO = 10;
+const int TENSION_NO = 5;
+
 abstract class State
 {
   this() @nogc
@@ -1944,7 +2120,14 @@ abstract class State
 	bool extended() @nogc {return false;}
 	bool blocking() @nogc {return false;}
 	
-	int[5] tensionList;
+	int[TENSION_NO] tensionList;
+	
+	@nogc
+	void attacks(ref AttackSphere[HITBOX_NO]){}
+	@nogc
+	void bodyBox(Animation** animation, real* frameValue);
+	@nogc
+	void onHit(int[HITBOX_NO] indices){}
 
   
   //~this() @nogc;
@@ -1954,6 +2137,8 @@ abstract class State
   public HorizontalDir facing;
   // public alias x = pos.x;
   // public alias y = pos.y;
+  
+  int damage = 0;
   
   BufferedState buffState;
   
@@ -1974,7 +2159,7 @@ abstract class State
 		{return 0;}
 	}
 	
-	static Vec3 movePosition(ref Fighter parent, greal nx, greal ny) @nogc
+	static Vec2 movePosition(ref Fighter parent, greal nx, greal ny) @nogc
 	{	
 		greal x, y;
 		
@@ -1990,7 +2175,7 @@ abstract class State
 		else
 			y = ny;
 			
-		return Vec3(x,y,0);
+		return Vec2(x,y);
 	}
 	
 	void animateState(Fighter parent) @nogc
@@ -2036,6 +2221,13 @@ abstract class AnimatedState : State
 		return &animations[anim];
 	}
 	
+	@nogc
+	void bodyBox(Animation** animation, real* frameValue)
+	{
+		*animation = getAnim();
+		*frameValue = timeFrame;
+	}
+	
 	// void animateState(Fighter f) @nogc
 	// {
 		// drawSkeletonMesh(f.skel, getAnim(), 0.0, true);
@@ -2050,16 +2242,17 @@ abstract class AnimatedState : State
 	}
 }
 
+struct AttackSphere
+{
+	greal x, y, radius;
+	bool active = false;
+}
 
 struct AttackSubstate
 {
-	struct AttackSphere
-	{
-		greal x, y, radius;
-		bool active = false;
-	}
+	void attacks(ref AttackSphere[HITBOX_NO]);
 	
-	ref AttackSphere[10] attacks();
+	bool hitLanded = false;
 }
 
 mixin template AttackMix()
@@ -2101,37 +2294,60 @@ class Idle : AnimatedState
 	{
 		//debug printf("Idle\n");
 		if (buttons[0])
-		  return makeState!Duck(x,y, facing);
+		  return createNewState!Duck(x,y, facing);
+		else if (buttons[2])
+			return createNewState!Kick(x,y, facing);
 		else if (horiDir != HorizontalDir.neutral)
 		{
 			//movePosition(parent, x+parent.ci.horiDir*0.1, y);
 		
-			return makeState!Idle(movePosition(parent, x+horiDir*(VerticalDir.down == vertDir ? 0.04 : 0.1), y).x, y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
+			return createNewState!Idle(movePosition(parent, x+horiDir*(VerticalDir.down == vertDir ? 0.04 : 0.1), y).x, y, facing, (timeFrame+1 > getAnim().frameNos.length/3)? 0: timeFrame+1);
 		}
 		else
 		  //return makeState!Idle(x,y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
-		  return createNewState!(Idle)(x,y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
+		  return createNewState!(Idle)(x,y, facing, (timeFrame+1 > getAnim().frameNos.length/3)? 0: timeFrame+1);
 	}
   }
   
   mixin serializableState;
 }
 
-class Step : State
+// class Step : State
+// {
+	// this() @nogc
+	// {}
+	
+   // this(greal x, greal y, HorizontalDir facing) @nogc
+  // {super(x,y, facing);}
+
+	// override State makeUpdate(Fighter parent) @nogc
+  // {
+	// x = x + parent.ci.horiDir;
+	// y = y + parent.ci.vertDir;
+		
+	// return makeState!Step(x,y, facing);
+  // }
+  
+  // mixin serializableState;
+// }
+
+class Dumb : AnimatedState
 {
 	this() @nogc
 	{}
 	
-   this(greal x, greal y, HorizontalDir facing) @nogc
-  {super(x,y, facing);}
+   this(greal x, greal y, HorizontalDir facing, int time = 0, int Duration = 60) @nogc
+  {super(x,y, facing, time); anim = fighterAnimSquat;}
 
 	override State makeUpdate(Fighter parent) @nogc
-  {
-	x = x + parent.ci.horiDir;
-	y = y + parent.ci.vertDir;
-		
-	return makeState!Step(x,y, facing);
-  }
+	{	
+		if (timeFrame < duration)
+			return createNewState!Dumb(movePosition(parent, x-facing*0.03, y).x, y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
+		else
+			return createNewState!Idle(x,y, facing);
+	}
+	
+	int duration;
   
   mixin serializableState;
 }
@@ -2148,9 +2364,9 @@ class Duck : AnimatedState
   {
     //debug printf("Duck\n");
     if (parent.ci.buttons[1])
-      return makeState!Idle(x,y, facing);
+      return createNewState!Idle(x,y, facing);
     else
-      return makeState!Duck(x,y, facing, timeFrame+1);
+      return createNewState!Duck(x,y, facing, timeFrame+1);
   }
   
   mixin serializableState;
@@ -2170,19 +2386,30 @@ class Kick : AnimatedState
   override State makeUpdate(Fighter parent) @nogc
   {
     //debug printf("Idle\n");
-    if (parent.ci.buttons[0])
-      return makeState!Duck(x,y, facing);
-    else if (parent.ci.horiDir != HorizontalDir.neutral)
+    if (parent.ci.buttons[0] && timeFrame <= 10)
+      return createNewState!Duck(x,y, facing);
+    else if (timeFrame < getAnim().frameNos.length)
 	{
 		//movePosition(parent, x+parent.ci.horiDir*0.1, y);
 	
-		return makeState!Idle(movePosition(parent, x+parent.ci.horiDir*0.1, y).x, y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
+		return createNewState!Kick(x, y, facing, timeFrame+1);
 	}
 	else
-      return makeState!Idle(x,y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
+      return createNewState!Idle(x,y, facing);
   }
   
-  bool attackState = true;
+  @nogc
+	void attacks(ref AttackSphere[HITBOX_NO] attks)
+	{
+		if (timeFrame > 20 && timeFrame < 30)
+		{
+			attks[0].active = true;
+			attks[0].radius = 0.2;
+			attks[0].x = x+facing*0.3;
+			attks[0].y = y+0.5;
+		}
+	}
+  
   mixin AttackMix;
   mixin serializableState;
 }

@@ -1876,7 +1876,7 @@ class Fighter
 				glVertex2f( -hsize, hsize );
 				glEnd();
 			  glPopMatrix();
-		}
+			}
 		}
 
 		glPushMatrix();
@@ -1885,19 +1885,20 @@ class Fighter
 			drawFighter(state);
 		glPopMatrix();
 		
-		if (attack)
+		
+		debug
 		{
-			AttackSphere[HITBOX_NO] as;
-			attacks(as);
-			
-			foreach (sphere; as)
+			if (attack)
 			{
-				sphere.render;
+				AttackSphere[HITBOX_NO] as;
+				attacks(as);
+				
+				foreach (sphere; as)
+				{
+					sphere.render();
+				}
 			}
 		}
-
-		 
-		 
 	  }
 	  
 	  void drawFighter(State s)
@@ -2310,17 +2311,12 @@ struct AttackSphere
 		if (active)
 		{
 			glPushMatrix();
-				glTranslatef(cast(float)x, cast(float)y, 0.0f);
-				glScalef(radius, radius, radius);
-				// glBegin( GL_QUADS );
-				// glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
-				// glVertex2f( -hsize, -hsize );
-				// glVertex2f( hsize, -hsize );
-				// glVertex2f( hsize, hsize );
-				// glVertex2f( -hsize, hsize );
 				const int NO_OF_SIDES = 20;
 				const float rotationAngle = 360.0f/NO_OF_SIDES;
 				const float halfFlare = tan(PI/NO_OF_SIDES);
+			
+				glTranslatef(cast(float)x, cast(float)y, 0.0f);
+				glScalef(radius, radius, radius);
 				glColor4f(0.8f, 0.0f, 0.0f, 1.0f);
 				
 				for(int ii = 0; ii < NO_OF_SIDES; ++ii)
@@ -2543,9 +2539,14 @@ class Kick : AnimatedState, AttackInterface
 		if (timeFrame > 25 && timeFrame < 30)
 		{
 			attks[0].active = true;
-			attks[0].radius = 2.0;
+			attks[0].radius = 1.0;
 			attks[0].x = x+facing*2.0;
-			attks[0].y = y;
+			attks[0].y = y+2.5;
+			
+			attks[1].active = true;
+			attks[1].radius = 1.0;
+			attks[1].x = x+facing*1.0;
+			attks[1].y = y+2.5;
 		}
 	}
   

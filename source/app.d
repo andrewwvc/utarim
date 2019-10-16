@@ -17,7 +17,7 @@ import std.meta;
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 1280;
-const int SCREEN_HEIGHT = 960;
+const int SCREEN_HEIGHT = 1280;
 
 //Ideal frame timing
 const long FRAME_RATE = 60;
@@ -1481,10 +1481,12 @@ void setupGame() @nogc
   debug{saveState();}
 }
 
+greal Z_DEPTH = 15.0;
+
 void renderFighters() @nogc
 {
 	glPushMatrix();
-		glTranslatef(0.0, -2.0, -15.0);
+		glTranslatef(0.0, -2.0, -Z_DEPTH);
 		P1.render();
 		P2.render();
 	glPopMatrix();
@@ -1521,7 +1523,7 @@ void collisions(Fighter agent, Fighter patient) @nogc
 {
 	//The hit override states allow a temoprary set of states to be created
 	//Multiple hits may cause a hit state to accumulate. Because of this, there must be a way of 'adding to' hit states which shoud be associative and comutative
-	//This should replace the tempState that would otherwise exist, destroying it. However, if the state has 'armour' then it may resist the hit transfer, meaning that the HitOverride shoudl be deleted instead.
+	//This should replace the tempState that would otherwise exist, destroying it. However, if the state has 'armour' then it may resist the hit transfer, meaning that the HitOverride should be deleted instead.
 	State agentHitOverride = null;
 	State patientHitOverride = null;
 
@@ -1538,12 +1540,14 @@ void collisions(Fighter agent, Fighter patient) @nogc
 		
 		if (agent.attack)
 		{
+			printf("Atacking!\n");
 			AttackSphere[HITBOX_NO] as;
 			Sphere3[HITBOX_NO] spheres;
 			Animation* patientBody;
 			real patientFrame;
+			int hitElementIndex;
 			
-			static GLMatrix IDENTITY = [1,0,0,0, 0,1,0,1, 0,0,1,0, 0,0,0,1];
+			GLMatrix POSITION = [0,0,patient.facing,0, 0,1,0,0, -patient.facing,0,0,0, patient.x, patient.y,0,1];
 			
 			agent.attacks(as);
 			patient.bodyBox(&patientBody, &patientFrame);
@@ -1565,7 +1569,7 @@ void collisions(Fighter agent, Fighter patient) @nogc
 				}
 			}
 			
-			bool hit = testSkeletonBall(patient.skel, *patientBody, patientFrame, IDENTITY, spheres[0..jj]);
+			bool hit = testSkeletonBall(patient.skel, *patientBody, patientFrame, POSITION, spheres[0..jj], &hitElementIndex);
 		
 			if (!hit)
 			{
@@ -1586,7 +1590,6 @@ void collisions(Fighter agent, Fighter patient) @nogc
 			else
 			{
 				//If hit occured, update hit override
-				
 				if (!patientHitOverride)
 				{
 					with (patient)
@@ -1595,6 +1598,8 @@ void collisions(Fighter agent, Fighter patient) @nogc
 					}
 				}				
 				
+				patient.damage += agent.attackDamage(hitElementIndex);
+				(cast(AttackInterface)(agent)).hitLanded = true;
 			}
 			
 		}
@@ -1647,19 +1652,39 @@ void collisions(Fighter agent, Fighter patient) @nogc
 	
 	damage_override_part:
 	
-	void damageOverride(State current, State damaged) @nogc
+	void damageOverride(Fighter f, State current, State damaged) @nogc
 	{
+		if (!current)
+		{
+		printf("Hit!\n");
+			//TempUpdate doens't exist
+			f.insertTempUpdate(damaged);
+		}
+		else if (current.recovery)
+		{
+			if (damaged.brokenness > current.brokenness)
+			{
+				f.insertTempUpdate(damaged);
+			}
+			
+			//Perform additional physics here!
+		}
+		else
+		{
+			//TempUpdate exists, is not a recovery state, and hence will be replaced
+			f.insertTempUpdate(damaged);
+		}
 		
 	}
 	
 	if (agentHitOverride)
 	{
-		damageOverride(agent.tempState, agentHitOverride);
+		damageOverride(agent, agent.tempState, agentHitOverride);
 	}
 	
 	if (patientHitOverride)
 	{
-		damageOverride(patient.tempState, agentHitOverride);
+		damageOverride(patient, patient.tempState, patientHitOverride);
 	}
 }
 
@@ -1798,8 +1823,10 @@ class Fighter
 	  
 	  void insertTempUpdate(State update)
 	  {
-		if (tempState) breakState(tempState);
-			tempState = update;
+		if (tempState)
+			breakState(tempState);
+			
+		tempState = update;
 	  }
 	  
 	  void createUpdate()
@@ -1829,31 +1856,45 @@ class Fighter
 	  
 	  void render()
 	  {
-		//Render quad
-		if( gRenderQuad )
+		debug
 		{
-		  const greal hsize = 8.0f/2.0f;
-		  glPushMatrix();
-			glScalef(0.05f, 0.05f, 0.05f);
-			glTranslatef(cast(float)x, cast(float)y, -20.0f);
-			glBegin( GL_QUADS );
-			glColor4f(ci.buttons[0] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-			glVertex2f( -hsize, -hsize );
-			glColor4f(ci.buttons[1] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-			glVertex2f( hsize, -hsize );
-			glColor4f(ci.buttons[2] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-			glVertex2f( hsize, hsize );
-			glColor4f(ci.buttons[3] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
-			glVertex2f( -hsize, hsize );
-			glEnd();
-		  glPopMatrix();
+			//Render quad
+			if( gRenderQuad )
+			{
+			  const greal hsize = 8.0f/2.0f;
+			  glPushMatrix();
+				glScalef(0.05f, 0.05f, 0.05f);
+				glTranslatef(cast(float)x, cast(float)y, -20.0f);
+				glBegin( GL_QUADS );
+				glColor4f(ci.buttons[0] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+				glVertex2f( -hsize, -hsize );
+				glColor4f(ci.buttons[1] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+				glVertex2f( hsize, -hsize );
+				glColor4f(ci.buttons[2] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+				glVertex2f( hsize, hsize );
+				glColor4f(ci.buttons[3] ? 1.0f : 0.2f, 0.0f, 0.0f, 1.0f);
+				glVertex2f( -hsize, hsize );
+				glEnd();
+			  glPopMatrix();
+		}
 		}
 
 		glPushMatrix();
 			glTranslatef(cast(float)x, cast(float)y, 0.0f);
-			glRotatef(90.0*state.facing, 0.0, 1.0, 0.0);
+			glRotatef(90.0*state.facing, 0.0f, 1.0f, 0.0f);
 			drawFighter(state);
 		glPopMatrix();
+		
+		if (attack)
+		{
+			AttackSphere[HITBOX_NO] as;
+			attacks(as);
+			
+			foreach (sphere; as)
+			{
+				sphere.render;
+			}
+		}
 
 		 
 		 
@@ -1946,12 +1987,20 @@ void breakState(State state)
 void transferState(S1, S2)(S1 agent, S2 patient) 
 {
 	patient.damage = agent.damage;
+	patient.x = agent.x;
+	patient.y = agent.y;
+	patient.facing = agent.facing;
 	
 	transferTensions(agent, patient);
 	
 	static if (is(S1 : AnimatedState) && is(S2 : AnimatedState))
 	{
 		patient.toBlendIndex = agent.anim;
+		
+		static if (is(S1 == S2))
+		{
+			patient.timeFrame = (agent.timeFrame+1 > agent.getAnim().frameNos.length)? 0: agent.timeFrame+1;
+		}
 	}
 }
 
@@ -2119,15 +2168,20 @@ abstract class State
 	bool attack() @nogc {return false;}
 	bool extended() @nogc {return false;}
 	bool blocking() @nogc {return false;}
+	bool recovery() @nogc {return false;}
 	
 	int[TENSION_NO] tensionList;
 	
 	@nogc
 	void attacks(ref AttackSphere[HITBOX_NO]){}
 	@nogc
+	int attackDamage(int hitElementIndex){return 0;}
+	@nogc
 	void bodyBox(Animation** animation, real* frameValue);
 	@nogc
 	void onHit(int[HITBOX_NO] indices){}
+	@nogc
+	int brokenness(){return 0;}
 
   
   //~this() @nogc;
@@ -2188,10 +2242,10 @@ abstract class State
   
     State makeUpdate(Fighter parent) @nogc;
 	
-	State createNewState(S, Args...)(auto ref Args args) @nogc
+	S createNewState(this TT, S, Args...)(auto ref Args args) @nogc
 	{	
 		S ss = makeState!(S)(args);
-		transferState(this, ss);
+		transferState(cast(TT) this, ss);
 		return ss;
 	}
 }
@@ -2246,27 +2300,85 @@ struct AttackSphere
 {
 	greal x, y, radius;
 	bool active = false;
+	
+	@nogc
+	void render()
+	{
+		import std.math;
+		
+		const greal hsize = 1.0;
+		if (active)
+		{
+			glPushMatrix();
+				glTranslatef(cast(float)x, cast(float)y, 0.0f);
+				glScalef(radius, radius, radius);
+				// glBegin( GL_QUADS );
+				// glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
+				// glVertex2f( -hsize, -hsize );
+				// glVertex2f( hsize, -hsize );
+				// glVertex2f( hsize, hsize );
+				// glVertex2f( -hsize, hsize );
+				const int NO_OF_SIDES = 20;
+				const float rotationAngle = 360.0f/NO_OF_SIDES;
+				const float halfFlare = tan(PI/NO_OF_SIDES);
+				glColor4f(0.8f, 0.0f, 0.0f, 1.0f);
+				
+				for(int ii = 0; ii < NO_OF_SIDES; ++ii)
+				{
+					
+					glBegin(GL_TRIANGLES);
+						glVertex3f(0.0f, 0.0f, 0.0f);
+						glVertex3f(halfFlare, 1.0f, 0.0f);
+						glVertex3f(-halfFlare, 1.0f, 0.0f);
+					glEnd();
+					
+					glRotatef(rotationAngle, 0.0f, 0.0f, 1.0f);
+				}
+				
+				//glEnd();
+			glPopMatrix();
+		}
+	}
 }
 
-struct AttackSubstate
-{
-	void attacks(ref AttackSphere[HITBOX_NO]);
+// struct AttackSubstate
+// {
+	// //void attacks(ref AttackSphere[HITBOX_NO]);
 	
-	bool hitLanded = false;
+	// bool hitLanded = false;
+// }
+
+interface AttackInterface
+{
+	@nogc
+	bool hitLanded();
+	@nogc
+	bool hitLanded(bool val);
 }
 
 mixin template AttackMix()
 {
-	AttackSubstate attacks;
+	bool hitLand = false;
+	
+	@property bool hitLanded() @nogc
+	{
+		return hitLand;
+	}
+	
+	@property bool hitLanded(bool val) @nogc
+	{
+		return hitLand = val;
+	}
 	
 	bool attack() {return true;}
+	bool extended() {return true;}
 	
 	 //bool attackState = true;
 }
 
 mixin template serializableState()
 {
-  auto retThis()
+  auto retThis() @nogc
   {
 	return this;
   }
@@ -2295,22 +2407,37 @@ class Idle : AnimatedState
 		//debug printf("Idle\n");
 		if (buttons[0])
 		{
-			Duck ss = createNewState!Duck();
-			duck.x = x;
-			duck.facing = facing;
+			Duck ss = createNewState!(Idle, Duck)();
+			//ss.x = x;
+			//ss.facing = facing;
 			return ss;
 		}
 		else if (buttons[2])
-			return createNewState!Kick(x,y, facing);
+		{
+			Kick ss = createNewState!(Idle, Kick)();
+			//ss.x = x;
+			//ss.facing = facing;
+			return ss;
+		}
 		else if (horiDir != HorizontalDir.neutral)
 		{
 			//movePosition(parent, x+parent.ci.horiDir*0.1, y);
 		
-			return createNewState!Idle(movePosition(parent, x+horiDir*(VerticalDir.down == vertDir ? 0.04 : 0.1), y).x, y, facing, (timeFrame+1 > getAnim().frameNos.length/3)? 0: timeFrame+1);
+			Idle ss = createNewState!(Idle,Idle)();
+			ss.x = movePosition(parent, x+horiDir*(VerticalDir.down == vertDir ? 0.04 : 0.1), y).x;
+			//ss.facing = facing;
+			ss.timeFrame = (timeFrame+1 > getAnim().frameNos.length/3)? 0 : timeFrame+1;
+			return ss;
 		}
 		else
 		  //return makeState!Idle(x,y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
-		  return createNewState!(Idle)(x,y, facing, (timeFrame+1 > getAnim().frameNos.length/3)? 0: timeFrame+1);
+		  {
+			Idle ss = createNewState!(Idle, Idle)(x,y, facing, (timeFrame+1 > getAnim().frameNos.length/3)? 0: timeFrame+1);
+			//ss.x = x;
+			//ss.facing = facing;
+			ss.timeFrame = (timeFrame+1 > getAnim().frameNos.length/3)? 0: timeFrame+1;
+			return ss;
+		  }
 	}
   }
   
@@ -2338,19 +2465,31 @@ class Idle : AnimatedState
 
 class Dumb : AnimatedState
 {
-	this() @nogc
-	{}
+	this(int Duration = 20) @nogc
+	{anim = fighterAnimSquat; duration = Duration;}
 	
-   this(greal x, greal y, HorizontalDir facing, int time = 0, int Duration = 60) @nogc
-  {super(x,y, facing, time); anim = fighterAnimSquat;}
+   this(greal x, greal y, HorizontalDir facing, int time = 0, int Duration = 20) @nogc
+  {super(x,y, facing, time); anim = fighterAnimSquat; duration = Duration;}
 
 	override State makeUpdate(Fighter parent) @nogc
 	{	
-		if (timeFrame < duration)
-			return createNewState!Dumb(movePosition(parent, x-facing*0.03, y).x, y, facing, (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1);
+		printf("Duration: %i\n", duration);
+		if (0 < duration)
+		{
+			printf("is\n");
+			Dumb ss = createNewState!(Dumb,Dumb)();
+			ss.x = movePosition(parent, x-facing*0.06, y).x;
+			ss.duration = duration-1;
+			return ss;
+		}
 		else
-			return createNewState!Idle(x,y, facing);
+		{
+			return createNewState!(Dumb,Idle)();
+		}
 	}
+	
+	override bool recovery() @nogc {return true;}
+	override int brokenness() @nogc {return 1;}
 	
 	int duration;
   
@@ -2360,7 +2499,7 @@ class Dumb : AnimatedState
 class Duck : AnimatedState
 {
   this() @nogc
-  {}
+  {anim = fighterAnimSquat;}
   
   this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
   {super(x,y, facing, time); anim = fighterAnimSquat;}
@@ -2369,15 +2508,15 @@ class Duck : AnimatedState
   {
     //debug printf("Duck\n");
     if (parent.ci.buttons[1])
-      return createNewState!Idle(x,y, facing);
+      return createNewState!(Duck,Idle)();
     else
-      return createNewState!Duck(x,y, facing, timeFrame+1);
+      return createNewState!(Duck,Duck)();
   }
   
   mixin serializableState;
 }
 
-class Kick : AnimatedState
+class Kick : AnimatedState, AttackInterface
 {
 	// int timeFrame = 0;
   this() @nogc
@@ -2386,32 +2525,27 @@ class Kick : AnimatedState
   this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
   {super(x,y, facing, time); anim = fighterAnimKick;}
   
-  //~this() @nogc {}
-  
   override State makeUpdate(Fighter parent) @nogc
   {
-    //debug printf("Idle\n");
     if (parent.ci.buttons[0] && timeFrame <= 10)
-      return createNewState!Duck(x,y, facing);
+      return createNewState!(Kick,Duck)();
     else if (timeFrame < getAnim().frameNos.length)
 	{
-		//movePosition(parent, x+parent.ci.horiDir*0.1, y);
-	
-		return createNewState!Kick(x, y, facing, timeFrame+1);
+		return createNewState!(Kick,Kick)();
 	}
 	else
-      return createNewState!Idle(x,y, facing);
+      return createNewState!(Kick,Idle)();
   }
   
   @nogc
 	void attacks(ref AttackSphere[HITBOX_NO] attks)
 	{
-		if (timeFrame > 20 && timeFrame < 30)
+		if (timeFrame > 25 && timeFrame < 30)
 		{
 			attks[0].active = true;
-			attks[0].radius = 0.2;
-			attks[0].x = x+facing*0.3;
-			attks[0].y = y+0.5;
+			attks[0].radius = 1.0;
+			attks[0].x = x+facing*2.0;
+			attks[0].y = y;
 		}
 	}
   

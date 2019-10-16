@@ -691,8 +691,9 @@ void drawSkeletonMeshInterpolated(ref Skeleton skel, ref Animation anim1, ref An
 	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
+int dummyLocation;
 
-bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GLMatrix posMat, Sphere3[] balls) @nogc
+bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GLMatrix posMat, Sphere3[] balls, int* hitElementIndex = &dummyLocation) @nogc
 {
     bool testBone(int index, Quat[] f, Quat[] g, vreal interpolation, ref GLMatrix newMat) @nogc
     {
@@ -737,10 +738,13 @@ bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GL
 			  auto endV = Vec3(0,0,0);
 			  
 			  auto p3 = Pill3(0.5, transformVec3(outmat, startV), transformVec3(outmat, endV));
-			  foreach (Sphere3 b; balls)
+			  foreach (int ii, Sphere3 b; balls)
 			  {
 				  if (hullPointTest(p3, b))
+				  {
+					*hitElementIndex = ii;
 					return true;
+				  }
 			  }
 	      
 			bool areChildrenHit = false;

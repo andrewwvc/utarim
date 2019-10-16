@@ -2543,7 +2543,7 @@ class Kick : AnimatedState, AttackInterface
 		if (timeFrame > 25 && timeFrame < 30)
 		{
 			attks[0].active = true;
-			attks[0].radius = 1.0;
+			attks[0].radius = 2.0;
 			attks[0].x = x+facing*2.0;
 			attks[0].y = y;
 		}

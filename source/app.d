@@ -2321,7 +2321,6 @@ struct AttackSphere
 				
 				for(int ii = 0; ii < NO_OF_SIDES; ++ii)
 				{
-					
 					glBegin(GL_TRIANGLES);
 						glVertex3f(0.0f, 0.0f, 0.0f);
 						glVertex3f(halfFlare, 1.0f, 0.0f);
@@ -2539,14 +2538,19 @@ class Kick : AnimatedState, AttackInterface
 		if (timeFrame > 25 && timeFrame < 30)
 		{
 			attks[0].active = true;
-			attks[0].radius = 1.0;
-			attks[0].x = x+facing*2.0;
+			attks[0].radius = 0.8;
+			attks[0].x = x+facing*2.2;
 			attks[0].y = y+2.5;
 			
 			attks[1].active = true;
-			attks[1].radius = 1.0;
-			attks[1].x = x+facing*1.0;
+			attks[1].radius = 0.8;
+			attks[1].x = x+facing*1.6;
 			attks[1].y = y+2.5;
+			
+			attks[2].active = true;
+			attks[2].radius = 0.8;
+			attks[2].x = x+facing*1.0;
+			attks[2].y = y+2.5;
 		}
 	}
   

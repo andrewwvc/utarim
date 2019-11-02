@@ -56,6 +56,7 @@ struct Bone
     Vec3 vOffset;
     //real fHingeAngle, fMin, fMax; //For inverse kinematics
     greal fLength;
+	greal fRadius;
 	GLfloat[24] boneVolume = cubeVerts;
 	GLuint boneVolumeID;
 	GLfloat[24] boneNormals;
@@ -79,11 +80,11 @@ struct Animation
   int[] frameNos;
 }
 
-GLfloat[24] generateBoneVolume(greal fLength)
+GLfloat[24] generateBoneVolume(greal fLength, greal fRadius)
 {
 	return [
-	    -0.25, 0.5*fLength, 0.25,  0.25, 0.5*fLength, 0.25,   -0.25, -0.5*fLength, 0.25,    0.25, -0.5*fLength, 0.25,
-	    -0.25, 0.5*fLength, -0.25,  0.25, 0.5*fLength, -0.25,   -0.25, -0.5*fLength, -0.25,    0.25, -0.5*fLength, -0.25];
+	    -fRadius, 0.5*fLength, fRadius,  fRadius, 0.5*fLength, fRadius,   -fRadius, -0.5*fLength, fRadius,    fRadius, -0.5*fLength, fRadius,
+	    -fRadius, 0.5*fLength, -fRadius,  fRadius, 0.5*fLength, -fRadius,   -fRadius, -0.5*fLength, -fRadius,    fRadius, -0.5*fLength, -fRadius];
 }
 
 void setupBoneVolumeBuffer(GLuint* volumeID, GLfloat[24]* boneVolume)
@@ -124,7 +125,9 @@ Skeleton makeSkeletonFile(string filename)
 	    lineBuffer = handle.readln();
 	    debug writeln("lb: ", lineBuffer);
 	    fLength = parse!double(lineBuffer);
-		boneVolume = generateBoneVolume(fLength);
+		lineBuffer = handle.readln();
+		fRadius = parse!double(lineBuffer);
+		boneVolume = generateBoneVolume(fLength, fRadius);
 		setupBoneVolumeBuffer(&boneVolumeID, &boneVolume);
 	    lineBuffer = handle.readln();
 	    debug writeln("lb: ", lineBuffer);
@@ -737,7 +740,7 @@ bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GL
 			  auto startV = Vec3(0,0-fLength,0);
 			  auto endV = Vec3(0,0,0);
 			  
-			  auto p3 = Pill3(0.5, transformVec3(outmat, startV), transformVec3(outmat, endV));
+			  auto p3 = Pill3(fRadius, transformVec3(outmat, startV), transformVec3(outmat, endV));
 			  foreach (int ii, Sphere3 b; balls)
 			  {
 				  if (hullPointTest(p3, b))

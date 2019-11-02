@@ -1350,7 +1350,7 @@ struct Gamestate
 	
 }
 
-greal arenaHalfwidth = 10.0;
+greal arenaHalfwidth = 12.0;
 
 Fighter P1;
 Fighter P2;

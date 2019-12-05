@@ -184,7 +184,7 @@ alias AnimationIndex = GenIndex;
 alias StateIndex = GenIndex;
 
 SkeletonIndex fighterSkeleton;
-AnimationIndex fighterAnimKick, fighterAnimSquat;
+AnimationIndex fighterAnimIdle, fighterAnimKick, fighterAnimSquat;
 
 Skeleton[1] skeletons;
 Animation[4] animations;
@@ -290,10 +290,12 @@ void loadFighterSkeleton()
 	skeletons[0] = makeSkeletonFile("./blend/skelcap.txt");
 	fighterSkeleton = 0;
 	
-	animations[0] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/LayKick.txt");
-	fighterAnimKick = 0;
-	animations[1] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/Squat.txt");
-	fighterAnimSquat = 1;
+	animations[0] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/Idle.txt");
+	fighterAnimIdle = 0;
+	animations[1] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/LayKick.txt");
+	fighterAnimKick = 1;
+	animations[2] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/Squat.txt");
+	fighterAnimSquat = 2;
 }
 
 void main()
@@ -2391,7 +2393,7 @@ class Idle : AnimatedState
   {}
   
   this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
-  {super(x,y, facing, time); anim = fighterAnimKick;}
+  {super(x,y, facing, time); anim = fighterAnimIdle;}
   
   //~this() @nogc {}
   
@@ -2421,7 +2423,7 @@ class Idle : AnimatedState
 			Idle ss = createNewState!(Idle,Idle)();
 			ss.x = movePosition(parent, x+horiDir*(VerticalDir.down == vertDir ? 0.04 : 0.1), y).x;
 			//ss.facing = facing;
-			ss.timeFrame = (timeFrame+1 > getAnim().frameNos.length/3)? 0 : timeFrame+1;
+			ss.timeFrame = (timeFrame+1 > getAnim().frameNos.length)? 0 : timeFrame+1;
 			return ss;
 		}
 		else
@@ -2430,7 +2432,7 @@ class Idle : AnimatedState
 			Idle ss = createNewState!(Idle, Idle)(x,y, facing, (timeFrame+1 > getAnim().frameNos.length/3)? 0: timeFrame+1);
 			//ss.x = x;
 			//ss.facing = facing;
-			ss.timeFrame = (timeFrame+1 > getAnim().frameNos.length/3)? 0: timeFrame+1;
+			ss.timeFrame = (timeFrame+1 > getAnim().frameNos.length)? 0: timeFrame+1;
 			return ss;
 		  }
 	}

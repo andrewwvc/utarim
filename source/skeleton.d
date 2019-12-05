@@ -485,8 +485,7 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 		  int minFrame = frameNos[0];
 		  //printf("len: %i\n", maxFrame);
 		  
-		  if (true)
-		  {
+
 			real frame;
 			real interp = modf(fvalue, frame);
 			foreach(int ii, Bone b; skel.bones)
@@ -495,46 +494,39 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 			  {
 				if (loop)
 				{
+					//frame1 and frame2 are 1 apart modulo totalframes
 					uint iframe = cast(uint)(frame);
-					drawBone(ii, frames[iframe%$], frames[(iframe+1)%$], interp, 1.0);
+					auto frame1 = iframe%frames.length;
+					auto frame2 = (iframe+1)%frames.length;
+					
+					Vec3 posA = anim.framePos[frame1].mult(1.0-interp);
+					Vec3 posB = anim.framePos[frame2].mult(interp);
+					Vec3 pos = posA+posB;
+					
+					glTranslatef(pos.x, pos.y, pos.z);
+					
+					drawBone(ii, frames[frame1], frames[frame2], interp, 1.0);
+					
+					glTranslatef(-pos.x, -pos.y, -pos.z);
 				}
 				else
 				{
-					drawBone(ii, frames[cast(uint)(fmin(frame, $-1))], frames[cast(uint)(fmin(frame+1, $-1))], interp, 1.0);
+					//frame1 and frame2 are 1 apart, of the same if frame >= totalframes 
+					auto frame1 = cast(uint)(fmin(frame, frames.length-1));
+					auto frame2 = cast(uint)(fmin(frame+1, frames.length-1));
+					
+					Vec3 posA = anim.framePos[frame1].mult(1.0-interp);
+					Vec3 posB = anim.framePos[frame2].mult(interp);
+					Vec3 pos = posA+posB;
+					
+					glTranslatef(pos.x, pos.y, pos.z);
+					
+					drawBone(ii, frames[frame1], frames[frame2], interp, 1.0);
+					
+					glTranslatef(-pos.x, -pos.y, -pos.z);
 				}
 			  }
 			}
-		  }
-		  else
-		  {
-			//Find frames
-			int fseed = 0;
-			
-			vreal internalVal = (fvalue % (maxFrame-minFrame)) + minFrame;
-			if (internalVal >= maxFrame)
-			  internalVal = minFrame;
-			
-			//printf("intVal: %f\n", internalVal);
-			while (!(frameNos[fseed] <= internalVal && internalVal < frameNos[fseed+1]))
-			  {++fseed;}
-			  
-			internalVal = (internalVal - frameNos[fseed]) / (frameNos[fseed+1]-frameNos[fseed]);
-			
-			Vec3 posA = anim.framePos[fseed].mult(1.0-internalVal);
-			Vec3 posB = anim.framePos[fseed+1].mult(internalVal);
-			Vec3 pos = posA+posB;
-			
-			glTranslatef(pos.x, pos.y, pos.z);
-			  
-			  foreach(int ii, Bone b; skel.bones)
-			  {
-			if (b.Parent == -1)
-			{
-			  drawBone(ii, frames[fseed], frames[fseed+1], internalVal, 1.0);
-			}
-			  }
-			glTranslatef(-pos.x, -pos.y, -pos.z);
-		  }
 		}
 	
 	glDisableClientState(GL_NORMAL_ARRAY);
@@ -781,7 +773,11 @@ bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GL
 	    {
 	      if (b.Parent == -1)
 	      {
-		    if (testBone(ii, frames[cast(uint)(fmin(frame, $-1))], frames[cast(uint)(fmin(frame+1, $-1))], interp, posMat))
+			//Equivilent to non-looping animation
+			auto frame1 = cast(uint)(fmin(frame, frames.length-1));
+			auto frame2 = cast(uint)(fmin(frame+1, frames.length-1));
+		  
+		    if (testBone(ii, frames[frame1], frames[frame2], interp, posMat))
 				return true;
 	      }
 	    }

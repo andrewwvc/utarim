@@ -688,6 +688,7 @@ void drawSkeletonMeshInterpolated(ref Skeleton skel, ref Animation anim1, ref An
 
 int dummyLocation;
 
+//TODO, test  
 bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GLMatrix posMat, Sphere3[] balls, int* hitElementIndex = &dummyLocation) @nogc
 {
     bool testBone(int index, Quat[] f, Quat[] g, vreal interpolation, ref GLMatrix newMat) @nogc
@@ -776,9 +777,27 @@ bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GL
 			//Equivilent to non-looping animation
 			auto frame1 = cast(uint)(fmin(frame, frames.length-1));
 			auto frame2 = cast(uint)(fmin(frame+1, frames.length-1));
+			
+			Vec3 posA = anim.framePos[frame1].mult(1.0-interp);
+			Vec3 posB = anim.framePos[frame2].mult(interp);
+			Vec3 pos = posA+posB;
+			
+			posMat[12] += pos.x;
+			posMat[13] += pos.y;
+			posMat[14] += pos.z;
 		  
 		    if (testBone(ii, frames[frame1], frames[frame2], interp, posMat))
+			{
+				posMat[12] -= pos.x;
+				posMat[13] -= pos.y;
+				posMat[14] -= pos.z;
+			
 				return true;
+			}
+				
+			posMat[12] -= pos.x;
+			posMat[13] -= pos.y;
+			posMat[14] -= pos.z;
 	      }
 	    }
 	  

@@ -17,7 +17,7 @@ import std.meta;
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 1280;
-const int SCREEN_HEIGHT = 1280;
+const int SCREEN_HEIGHT = 960;
 
 //Ideal frame timing
 const long FRAME_RATE = 60;
@@ -62,7 +62,7 @@ void setupSkelGL()
     glLoadIdentity();
     //gluPerspective(fov, cast(float)height / width, nearPlane, farPlane);
     GLMatrix matrix;
-    glhPerspectivef2(matrix, fov, cast(float)height / cast(float)width, nearPlane, farPlane);
+    glhPerspectivef2(matrix, fov, cast(float)width/cast(float)height, nearPlane, farPlane);
     debug printf("%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n", matrix[0], matrix[1], matrix[2], matrix[3],  matrix[4], matrix[5], matrix[6], matrix[7],
     matrix[8], matrix[9], matrix[10], matrix[11],  matrix[12], matrix[13], matrix[14], matrix[15],);
     glLoadMatrixf(matrix.ptr);
@@ -184,7 +184,7 @@ alias AnimationIndex = GenIndex;
 alias StateIndex = GenIndex;
 
 SkeletonIndex fighterSkeleton;
-AnimationIndex fighterAnimIdle, fighterAnimKick, fighterAnimSquat;
+AnimationIndex fighterAnimIdle, fighterAnimKick, fighterAnimSquat, fighterAnimFrontFlip;
 
 Skeleton[1] skeletons;
 Animation[4] animations;
@@ -296,6 +296,8 @@ void loadFighterSkeleton()
 	fighterAnimKick = 1;
 	animations[2] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/Squat.txt");
 	fighterAnimSquat = 2;
+	animations[3] = makeAnimationFile(skeletons[fighterSkeleton], "./blend/FrontFlip.txt");
+	fighterAnimFrontFlip = 3;
 }
 
 void main()
@@ -318,7 +320,7 @@ void main()
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
 	
 	//Create window
-	gWindow = SDL_CreateWindow("Utarim", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN );
+	gWindow = SDL_CreateWindow("Utarim", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN );
 	if( gWindow == null )
 	  {printf( "Window could not be created! SDL Error: %s\n", SDL_GetError()); return;}
 	scope(exit) SDL_DestroyWindow(gWindow);
@@ -1549,7 +1551,7 @@ void collisions(Fighter agent, Fighter patient) @nogc
 			real patientFrame;
 			int hitElementIndex;
 			
-			GLMatrix POSITION = [0,0,patient.facing,0, 0,1,0,0, -patient.facing,0,0,0, patient.x, patient.y,0,1];
+			GLMatrix POSITION = [0,0,patient.facing,0, 0,1,0,0, patient.facing,0,0,0, patient.x, patient.y,0,1];
 			
 			agent.attacks(as);
 			patient.bodyBox(&patientBody, &patientFrame);
@@ -1883,7 +1885,7 @@ class Fighter
 
 		glPushMatrix();
 			glTranslatef(cast(float)x, cast(float)y, 0.0f);
-			glRotatef(90.0*state.facing, 0.0f, 1.0f, 0.0f);
+			glRotatef(-90.0*state.facing, 0.0f, 1.0f, 0.0f);
 			drawFighter(state);
 		glPopMatrix();
 		
@@ -2496,10 +2498,10 @@ class Dumb : AnimatedState
 class Duck : AnimatedState
 {
   this() @nogc
-  {anim = fighterAnimSquat;}
+  {anim = fighterAnimFrontFlip;}
   
   this(greal x, greal y, HorizontalDir facing, int time = 0) @nogc
-  {super(x,y, facing, time); anim = fighterAnimSquat;}
+  {super(x,y, facing, time); anim = fighterAnimFrontFlip;}
   
   override State makeUpdate(Fighter parent) @nogc
   {
@@ -2539,20 +2541,22 @@ class Kick : AnimatedState, AttackInterface
 	{
 		if (timeFrame > 25 && timeFrame < 30)
 		{
+			const greal height = y+2.5;
+			
 			attks[0].active = true;
 			attks[0].radius = 0.8;
 			attks[0].x = x+facing*2.2;
-			attks[0].y = y+2.5;
+			attks[0].y = height;
 			
 			attks[1].active = true;
 			attks[1].radius = 0.8;
 			attks[1].x = x+facing*1.6;
-			attks[1].y = y+2.5;
+			attks[1].y = height;
 			
 			attks[2].active = true;
 			attks[2].radius = 0.8;
 			attks[2].x = x+facing*1.0;
-			attks[2].y = y+2.5;
+			attks[2].y = height;
 		}
 	}
   

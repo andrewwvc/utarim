@@ -786,18 +786,14 @@ bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GL
 			posMat[13] += pos.y;
 			posMat[14] += pos.z;
 		  
-		    if (testBone(ii, frames[frame1], frames[frame2], interp, posMat))
-			{
-				posMat[12] -= pos.x;
-				posMat[13] -= pos.y;
-				posMat[14] -= pos.z;
-			
-				return true;
-			}
+		    bool retVar = (testBone(ii, frames[frame1], frames[frame2], interp, posMat));
 				
 			posMat[12] -= pos.x;
 			posMat[13] -= pos.y;
 			posMat[14] -= pos.z;
+			
+			if (retVar)
+				return true;
 	      }
 	    }
 	  

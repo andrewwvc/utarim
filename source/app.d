@@ -1551,7 +1551,7 @@ void collisions(Fighter agent, Fighter patient) @nogc
 			real patientFrame;
 			int hitElementIndex;
 			
-			GLMatrix POSITION = [0,0,-patient.facing,0, 0,1,0,0, -patient.facing,0,0,0, patient.x, patient.y,0,1];
+			GLMatrix POSITION = [0,0,patient.facing,0, 0,1,0,0, patient.facing,0,0,0, patient.x, patient.y,0,1];
 			
 			agent.attacks(as);
 			patient.bodyBox(&patientBody, &patientFrame);
@@ -1885,7 +1885,7 @@ class Fighter
 
 		glPushMatrix();
 			glTranslatef(cast(float)x, cast(float)y, 0.0f);
-			glRotatef(-90.0*state.facing, 0.0f, 1.0f, 0.0f);
+			glRotatef(90.0*state.facing, 0.0f, 1.0f, 0.0f);
 			drawFighter(state);
 		glPopMatrix();
 		

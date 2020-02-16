@@ -36,6 +36,9 @@ struct Vec2
 	
 	this(vreal X, vreal Y) @nogc
 		{x=X; y=Y;}
+		
+	this(const ref Vec3 v3) @nogc
+		{x=v3.x; y=v3.y;}
 
     @property string toString() const
     {
@@ -56,8 +59,8 @@ struct Vec2
     {return Vec2(x+rhs.x, y+rhs.y);}
 
     @nogc
-    Vec2 opBinary(string op)(Vec22 rhs) if (op == "-")
-    {return Vec3(x-rhs.x, y-rhs.y);}
+    Vec2 opBinary(string op)(Vec2 rhs) if (op == "-")
+    {return Vec2(x-rhs.x, y-rhs.y);}
 
     @nogc
     Vec2 mult(vreal mul)
@@ -524,6 +527,7 @@ struct Pill3
 	Vec3 start;
 	Vec3 end;
 }
+
 struct Sphere3
 {
 	vreal radius;
@@ -559,6 +563,36 @@ bool hullPointTest(ref Pill3 pill, ref Sphere3 sphere) @nogc
 		Vec3 modPillMid = modPillEnd*(cosPoint/modPillLength);//modPillEnd/cos, provides the projection of
 		//printf("modPillMid: %s\n", modPillMid.toString());
 		Vec3 distVec = modPoint - modPillMid;
+		return distVec.length < dist;
+	}
+}
+
+//Returns true of a collision between a pill and a sphere in 2D space
+bool shellPointTest(ref Pill3 pill, ref Sphere3 sphere)@nogc
+{
+	vreal dist = pill.radius + sphere.radius;
+	
+	Vec2 modPillEnd = Vec2(pill.end) - Vec2(pill.start);
+	
+	Vec2 modPoint = Vec2(sphere.point) - Vec2(pill.start);
+	
+	vreal modPillLength = modPillEnd.length();
+	
+	vreal cosPoint = modPillEnd.dot(modPoint)/modPillLength;
+	
+	if (cosPoint >= modPillLength)
+	{
+		return (modPillEnd - modPoint).length <= dist; //end cap
+	}
+	else if (cosPoint <= 0.0)
+	{
+		return modPoint.length <= dist; //start cap
+	}
+	else
+	{
+		Vec2 modPillMid = modPillEnd*(cosPoint/modPillLength);//modPillEnd/cos, provides the projection of
+		
+		Vec2 distVec = modPoint - modPillMid;
 		return distVec.length < dist;
 	}
 }

@@ -1530,6 +1530,40 @@ void collisions(Fighter agent, Fighter patient) @nogc
 	//This should replace the tempState that would otherwise exist, destroying it. However, if the state has 'armour' then it may resist the hit transfer, meaning that the HitOverride should be deleted instead.
 	State agentHitOverride = null;
 	State patientHitOverride = null;
+	
+	bool testHitboxOverlap(Fighter aa, Fighter bb, int *hitElementIndex)
+	{
+		printf("Atacking!\n");
+		AttackSphere[HITBOX_NO] as;
+		Sphere3[HITBOX_NO] spheres;
+		Animation* bbBody;
+		real bbFrame;
+
+		
+		GLMatrix POSITION = [0,0,bb.facing,0, 0,1,0,0, bb.facing,0,0,0, bb.x, bb.y,0,1];
+		
+		aa.attacks(as);
+		bb.bodyBox(&bbBody, &bbFrame);
+		
+		int jj = 0;
+		
+		for (int ii = 0; ii < HITBOX_NO; ++ii)
+		{
+			if (as[ii].active)
+			{
+				with (spheres[jj])
+				{
+					radius = as[ii].radius;
+					point.x = as[ii].x;
+					point.y = as[ii].y;
+				}
+				
+				++jj;
+			}
+		}
+		
+		return testSkeletonBall(bb.skel, *bbBody, bbFrame, POSITION, spheres[0..jj], hitElementIndex);
+	}
 
 	if (agent.extended)
 	{
@@ -1609,7 +1643,7 @@ void collisions(Fighter agent, Fighter patient) @nogc
 		}
 	}
 	
-	if (patient.extended)
+	if (patient.extended)//AND agent not extended
 	{
 		if (agent.parry)
 		{
@@ -1622,6 +1656,8 @@ void collisions(Fighter agent, Fighter patient) @nogc
 		
 		if (patient.attack)
 		{
+			int hitElementIndex;
+		
 			if (/*A not hit*/ false)
 			{
 				if (/*A extended*/ false)
@@ -1633,6 +1669,17 @@ void collisions(Fighter agent, Fighter patient) @nogc
 			else
 			{
 				//If hit occured, update hit override
+				//If hit occured, update hit override
+				if (!agentHitOverride)
+				{
+					with (agent)
+					{
+						agentHitOverride = makeState!(Dumb)(x, y, facing);
+					}
+				}				
+				
+				agent.damage += patient.attackDamage(hitElementIndex);
+				(cast(AttackInterface)(patient)).hitLanded = true;
 			}
 		}
 	}

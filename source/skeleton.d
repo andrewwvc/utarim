@@ -455,6 +455,7 @@ void drawSkeletonMesh(ref Skeleton skel, ref Animation anim, real fvalue, bool l
 
 	      foreach(int ii; Child)
 	      {
+			  //Children are 0 by default, and it is assumed that the 0th bone is a root
 			  if (ii != 0)
 			  {
 				drawBone(ii, f, g, interpolation, col*0.8);
@@ -736,7 +737,8 @@ bool testSkeletonBall(ref Skeleton skel, ref Animation anim, real fvalue, ref GL
 			  auto p3 = Pill3(fRadius, transformVec3(outmat, startV), transformVec3(outmat, endV));
 			  foreach (int ii, Sphere3 b; balls)
 			  {
-				  if (hullPointTest(p3, b))
+				  //if (hullPointTest(p3, b))
+				  if (shellPointTest(p3, b))
 				  {
 					*hitElementIndex = ii;
 					return true;

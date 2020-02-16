@@ -1531,7 +1531,7 @@ void collisions(Fighter agent, Fighter patient) @nogc
 	State agentHitOverride = null;
 	State patientHitOverride = null;
 	
-	bool testHitboxOverlap(Fighter aa, Fighter bb, int *hitElementIndex)
+	bool testHitboxOverlap(Fighter aa, Fighter bb, int *hitElementIndex) @nogc
 	{
 		//printf("Atacking!\n");
 		AttackSphere[HITBOX_NO] as;
@@ -1580,7 +1580,7 @@ void collisions(Fighter agent, Fighter patient) @nogc
 		{
 			int hitElementIndex;
 			
-			testHitboxOverlap(agent, patient, &hitElementIndex);
+			bool hit = testHitboxOverlap(agent, patient, &hitElementIndex);
 		
 			if (!hit)
 			{
@@ -1630,8 +1630,10 @@ void collisions(Fighter agent, Fighter patient) @nogc
 		if (patient.attack)
 		{
 			int hitElementIndex;
+			
+			bool hit = testHitboxOverlap(patient, agent, &hitElementIndex);
 		
-			if (/*A not hit*/ false)
+			if (!hit)
 			{
 				if (/*A extended*/ false)
 				{
@@ -1681,7 +1683,7 @@ void collisions(Fighter agent, Fighter patient) @nogc
 		if (!current)
 		{
 		printf("Hit!\n");
-			//TempUpdate doens't exist
+			//TempUpdate doesn't exist
 			f.insertTempUpdate(damaged);
 		}
 		else if (current.recovery)

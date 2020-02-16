@@ -1533,7 +1533,7 @@ void collisions(Fighter agent, Fighter patient) @nogc
 	
 	bool testHitboxOverlap(Fighter aa, Fighter bb, int *hitElementIndex)
 	{
-		printf("Atacking!\n");
+		//printf("Atacking!\n");
 		AttackSphere[HITBOX_NO] as;
 		Sphere3[HITBOX_NO] spheres;
 		Animation* bbBody;
@@ -1578,36 +1578,9 @@ void collisions(Fighter agent, Fighter patient) @nogc
 		
 		if (agent.attack)
 		{
-			printf("Atacking!\n");
-			AttackSphere[HITBOX_NO] as;
-			Sphere3[HITBOX_NO] spheres;
-			Animation* patientBody;
-			real patientFrame;
 			int hitElementIndex;
 			
-			GLMatrix POSITION = [0,0,patient.facing,0, 0,1,0,0, patient.facing,0,0,0, patient.x, patient.y,0,1];
-			
-			agent.attacks(as);
-			patient.bodyBox(&patientBody, &patientFrame);
-			
-			int jj = 0;
-			
-			for (int ii = 0; ii < HITBOX_NO; ++ii)
-			{
-				if (as[ii].active)
-				{
-					with (spheres[jj])
-					{
-						radius = as[ii].radius;
-						point.x = as[ii].x;
-						point.y = as[ii].y;
-					}
-					
-					++jj;
-				}
-			}
-			
-			bool hit = testSkeletonBall(patient.skel, *patientBody, patientFrame, POSITION, spheres[0..jj], &hitElementIndex);
+			testHitboxOverlap(agent, patient, &hitElementIndex);
 		
 			if (!hit)
 			{
